@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#F6F2EB">
+<meta name="format-detection" content="telephone=no">
+<title>优日</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="seal" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none">
+          <rect x="7.5" y="8" width="17" height="17.5" rx="3.2" fill="#FBF3E6"/>
+          <path d="M10.2 8h11.6a2.7 2.7 0 0 1 2.7 2.7v3.6H7.5v-3.6A2.7 2.7 0 0 1 10.2 8Z" fill="#9E3A27"/>
+          <rect x="10.8" y="5" width="1.6" height="5.2" rx=".8" fill="#FBF3E6"/>
+          <rect x="19.6" y="5" width="1.6" height="5.2" rx=".8" fill="#FBF3E6"/>
+          <rect x="10.5" y="17.3" width="3" height="3" rx=".8" fill="#DFCEB7"/>
+          <rect x="14.5" y="17.3" width="3" height="3" rx=".8" fill="#C8553D"/>
+          <rect x="18.5" y="17.3" width="3" height="3" rx=".8" fill="#DFCEB7"/>
+          <rect x="10.5" y="21.6" width="3" height="3" rx=".8" fill="#DFCEB7"/>
+          <rect x="14.5" y="21.6" width="3" height="3" rx=".8" fill="#DFCEB7"/>
+          <rect x="18.5" y="21.6" width="3" height="3" rx=".8" fill="#DFCEB7"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1 id="pageTitle">优日</h1>
+        <p id="pageSub">记录值得记住的日子</p>
+      </div>
+    </div>
+    <div class="top-actions" id="topActions"></div>
+  </header>
+
+  <main class="view" id="viewHome">
+    <div id="homeContent"></div>
+  </main>
+
+  <main class="view" id="viewCats" hidden>
+    <div id="catsContent"></div>
+  </main>
+
+  <nav class="tabbar" aria-label="主导航">
+    <button class="tab" data-view="home" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.2 12 3.5l8.5 6.7"/><path d="M5.5 9.3V20h13V9.3"/><path d="M9.8 20v-5.4h4.4V20"/></svg>
+      <span>首页</span>
+    </button>
+    <button class="fab" id="fabNew" aria-label="新建日子">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"/></svg>
+    </button>
+    <button class="tab" data-view="cats" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 21 8l-9 4.8L3 8l9-4.8Z"/><path d="m3 12.6 9 4.8 9-4.8"/><path d="m3 17 9 4.8 9-4.8"/></svg>
+      <span>分类</span>
+    </button>
+  </nav>
+</div>
+
+<!-- 新建 / 编辑日子 -->
+<div class="layer" id="editorLayer" hidden>
+  <section class="sheet full" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+    <header class="sheet-head">
+      <button class="text-btn" data-act="editor-close">取消</button>
+      <h2 id="editorTitle">新建日子</h2>
+      <span class="head-ghost"></span>
+    </header>
+    <div class="sheet-scroll" id="editorScroll">
+      <div class="cal-wrap" id="calWrap" data-open="true">
+        <div class="cal-wrap-inner">
+          <div class="cal">
+        <div class="cal-head">
+          <button class="cal-nav" data-act="cal-prev" aria-label="上个月">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 5.5-7 6.5 7 6.5"/></svg>
+          </button>
+          <button class="cal-title" data-act="cal-jump" aria-expanded="false">
+            <span id="calTitle">2026年10月</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 5.5 6-5.5"/></svg>
+          </button>
+          <button class="cal-nav" data-act="cal-next" aria-label="下个月">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 5.5 7 6.5-7 6.5"/></svg>
+          </button>
+        </div>
+
+        <div class="jump" id="jumpPanel" hidden>
+          <div class="jump-years">
+            <button class="jump-step" data-act="jump-year" data-dir="-1" aria-label="上一年">−</button>
+            <b id="jumpYear">2026</b>
+            <button class="jump-step" data-act="jump-year" data-dir="1" aria-label="下一年">＋</button>
+          </div>
+          <div class="jump-months" id="jumpMonths"></div>
+        </div>
+
+        <div class="cal-week" aria-hidden="true">
+          <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-foot">
+          <button class="link" data-act="cal-today">回到今天</button>
+          <span class="cal-events-hint" id="calEventsHint"></span>
+        </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="picked" id="picked"></div>
+
+      <div class="field">
+        <label for="evName">事件名称 <span class="hint">必填</span></label>
+        <input id="evName" type="text" maxlength="24" autocomplete="off" placeholder="给这个日子起个名字">
+      </div>
+
+      <div class="field">
+        <label>一级分类 <span class="hint">可不选</span></label>
+        <div class="chips" id="chip1"></div>
+      </div>
+
+      <div class="field" id="field2" hidden>
+        <label>二级分类 <span class="hint">可不选</span></label>
+        <div class="chips small" id="chip2"></div>
+      </div>
+
+      <button class="switch-row" data-act="toggle-repeat" role="switch" aria-checked="false" id="repeatRow">
+        <span class="switch-text">
+          <b>每年重复</b>
+          <i>生日、结婚纪念日等固定日子</i>
+        </span>
+        <span class="switch" data-on="false" aria-hidden="true"></span>
+      </button>
+
+      <div class="field">
+        <label for="evNote">备注 <span class="hint">可选</span></label>
+        <textarea id="evNote" rows="2" maxlength="140" placeholder="想记下的话"></textarea>
+      </div>
+
+      <p class="editor-hint">未来的日子会倒数，过去的日子会纪念。</p>
+    </div>
+    <div class="sheet-foot">
+      <button class="primary" data-act="editor-save" id="saveBtn">保存</button>
+    </div>
+  </section>
+</div>
+
+<!-- 日子详情 -->
+<div class="layer" id="detailLayer" hidden>
+  <section class="sheet detail-sheet" role="dialog" aria-modal="true" aria-labelledby="detailName">
+    <div class="grabber"></div>
+    <button class="sheet-close" data-act="detail-close" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
+    <div class="detail-body" id="detailBody"></div>
+    <div class="detail-foot" id="detailFoot"></div>
+  </section>
+</div>
+
+<!-- 坚果云同步 -->
+<div class="layer" id="syncLayer" hidden>
+  <section class="sheet sync-sheet" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
+    <div class="grabber"></div>
+    <button class="sheet-close" data-act="sync-close" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
+    <header class="sync-head">
+      <div class="sync-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18.5h9.3a3.6 3.6 0 0 0 .5-7.2A5 5 0 0 0 7.3 10.2 4.1 4.1 0 0 0 7 18.5Z"/><path d="M12 15.2v-4M10.4 12.8 12 11.2l1.6 1.6"/></svg>
+      </div>
+      <h2 id="syncTitle">同步与备份</h2>
+      <p>把日子备份到坚果云，换手机也能找回。</p>
+    </header>
+    <div class="sheet-scroll">
+      <div class="cloud-status" id="cloudStatus" data-state="off">
+        <span class="cloud-status-dot" aria-hidden="true"></span>
+        <div class="cloud-status-text">
+          <b id="cloudStatusTitle">未连接</b>
+          <small id="cloudStatusSub">填写坚果云账号与应用密码</small>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="davUser">坚果云账号</label>
+        <input id="davUser" type="email" inputmode="email" autocomplete="username" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="davPass">应用密码 <span class="hint">不是登录密码</span></label>
+        <div class="secret-field">
+          <input id="davPass" type="password" autocomplete="current-password" placeholder="在坚果云「安全选项」中生成">
+          <button class="secret-toggle" data-act="toggle-pass" id="passToggle">显示</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="davPath">备份文件 <span class="hint">坚果云根目录</span></label>
+        <input id="davPath" type="text" autocomplete="off" value="/youri-backup.json" spellcheck="false">
+      </div>
+
+      <button class="switch-row" data-act="toggle-auto" id="autoRow" role="switch" aria-checked="false">
+        <span class="switch-text">
+          <b>自动备份</b>
+          <i>每次修改后自动上传到坚果云</i>
+        </span>
+        <span class="switch" data-on="false" aria-hidden="true"></span>
+      </button>
+
+      <p class="cloud-msg" id="cloudMsg" hidden></p>
+
+      <div class="cloud-actions">
+        <button class="primary" data-act="dav-connect" id="davConnectBtn">保存并测试连接</button>
+        <div class="cloud-grid">
+          <button class="ghost" data-act="dav-upload" id="davUploadBtn">立即上传</button>
+          <button class="ghost" data-act="dav-restore" id="davRestoreBtn">从云端恢复</button>
+        </div>
+        <button class="ghost danger-text" data-act="dav-disconnect" id="davDisconnectBtn" hidden>断开连接</button>
+      </div>
+
+      <details class="cloud-help">
+        <summary>如何获取应用密码？</summary>
+        <p>坚果云网页版 → 右上角账户信息 → 安全选项 → 添加应用密码。</p>
+        <p>账号与应用密码只保存在本机，仅用于访问你自己的坚果云 WebDAV，可随时在坚果云撤销。若忘记密码，重新生成一个即可。</p>
+      </details>
+    </div>
+  </section>
+</div>
+
+<!-- 分类编辑 -->
+<div class="layer" id="catLayer" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="catTitle">
+    <div class="grabber"></div>
+    <header class="sheet-head inline">
+      <button class="text-btn" data-act="cat-cancel">取消</button>
+      <h2 id="catTitle">新建分类</h2>
+      <span class="head-ghost"></span>
+    </header>
+    <div class="sheet-scroll">
+      <div class="field">
+        <label for="catName">名称</label>
+        <input id="catName" type="text" maxlength="8" autocomplete="off" placeholder="例如：生活">
+      </div>
+      <div class="field">
+        <label>颜色</label>
+        <div class="swatches" id="catColors"></div>
+      </div>
+      <p class="modal-note" id="catNote"></p>
+    </div>
+    <div class="sheet-foot col">
+      <button class="primary" data-act="cat-save">保存</button>
+      <button class="ghost danger-text" data-act="cat-delete" id="catDeleteBtn" hidden>删除分类</button>
+    </div>
+  </section>
+</div>
+
+<!-- 确认框 -->
+<div class="layer center" id="confirmLayer" hidden>
+  <div class="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle">确认删除</h3>
+    <p id="confirmText"></p>
+    <div class="confirm-actions">
+      <button class="ghost" data-act="confirm-cancel">取消</button>
+      <button class="danger-solid" data-act="confirm-ok" id="confirmOk">删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

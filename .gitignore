@@ -1,0 +1,14 @@
+node_modules/
+**/android/.gradle/
+**/android/build/
+**/android/app/build/
+build.log
+build-*.log
+*.hprof
+.DS_Store
+
+# 上一版 APK（只保留当前版本）
+/手机端/优日-1.0.0.apk
+
+# 本地构建工具链
+/Env/
