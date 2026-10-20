@@ -48,7 +48,7 @@ await new Promise((resolve) => server.listen(PORT, '127.0.0.1', resolve));
 const edgeArgs = [
   '--headless=new',
   `--remote-debugging-port=${DEBUG_PORT}`,
-  `--user-data-dir=${path.join(process.env.TEMP, 'youri-edge-profile')}`,
+  `--user-data-dir=${path.join(process.env.TEMP, `youri-edge-profile-${process.pid}`)}`,
   '--no-first-run',
   '--no-default-browser-check',
   '--disable-gpu',
@@ -176,6 +176,24 @@ results.folders = await evaluate("document.querySelectorAll('.folder').length");
 results.events = await evaluate("document.querySelectorAll('.event').length");
 results.hero = await evaluate("document.querySelector('.hero-name')?.textContent");
 await shot('01-home');
+
+// 首页排序模式
+await evaluate("document.querySelector('[data-act=\"sort-start\"]').click()");
+await sleep(450);
+results.sortFolders = await evaluate("document.querySelectorAll('.folder-head.sorting').length");
+results.sortEvents = await evaluate("document.querySelectorAll('.event.sorting').length");
+results.sortButtons = await evaluate("document.querySelectorAll('.sort-btn').length");
+await shot('10-sort');
+await evaluate(`(() => {
+  const heads = [...document.querySelectorAll('.folder-head.sorting')];
+  heads[1].querySelector('[data-act="move-cat"][data-dir="-1"]').click();
+})()`);
+await sleep(400);
+results.sortFirstFolder = await evaluate("document.querySelector('.folder-name')?.textContent");
+await evaluate("document.querySelector('[data-act=\"sort-done\"]').click()");
+await sleep(300);
+results.sortExited = await evaluate("!document.querySelector('.folder-head.sorting') && !!document.querySelector('.hero')");
+await reloadAndWait();
 
 // 同步设置（未连接）
 await evaluate("document.querySelector('[data-act=\"open-sync\"]').click()");
@@ -416,6 +434,65 @@ await sleep(400);
 await evaluate("document.querySelector('[data-act=\"confirm-ok\"]').click()");
 await sleep(600);
 results.emptyAfterDelete = await evaluate("!!document.querySelector('.empty')");
+
+/* ------------------------- 首页排序持久化测试 ------------------------- */
+await evaluate(`(() => {
+  const seed = {
+    v: 1,
+    cats: [
+      { id: 'c_life', name: '生活', color: '#C8553D', parent: null },
+      { id: 'c_family', name: '家人', color: '#B8893B', parent: null },
+      { id: 'c_travel', name: '旅行', color: '#4F7396', parent: 'c_life' },
+      { id: 'c_bday', name: '生日', color: '#A87B93', parent: 'c_life' }
+    ],
+    events: [
+      { id: 'e1', name: '近的日子', date: '2030-01-10', cat1: 'c_life', cat2: null, repeatYearly: false, note: '', createdAt: 1 },
+      { id: 'e2', name: '远的日子', date: '2030-06-10', cat1: 'c_life', cat2: null, repeatYearly: false, note: '', createdAt: 2 },
+      { id: 'e3', name: '生日聚会', date: '2030-11-10', cat1: 'c_life', cat2: 'c_bday', repeatYearly: false, note: '', createdAt: 3 },
+      { id: 'e4', name: '家里的日子', date: '2030-12-10', cat1: 'c_family', cat2: null, repeatYearly: false, note: '', createdAt: 4 },
+      { id: 'e5', name: '去旅行', date: '2030-08-10', cat1: 'c_life', cat2: 'c_travel', repeatYearly: false, note: '', createdAt: 5 }
+    ],
+    collapsed: {},
+    updatedAt: 0
+  };
+  localStorage.setItem('youri.state.v1', JSON.stringify(seed));
+})()`);
+await reloadAndWait();
+results.sortSeedEvents = await evaluate("document.querySelectorAll('.event').length");
+
+await evaluate("document.querySelector('[data-act=\"sort-start\"]').click()");
+await sleep(450);
+await evaluate(`(() => {
+  const row = [...document.querySelectorAll('.event.sorting')].find((r) => r.textContent.includes('远的日子'));
+  row.querySelector('[data-act="move-event"][data-dir="-1"]').click();
+})()`);
+await sleep(350);
+await evaluate(`(() => {
+  const head = [...document.querySelectorAll('.folder-head.sorting')].find((h) => h.textContent.includes('家人'));
+  head.querySelector('[data-act="move-cat"][data-dir="-1"]').click();
+})()`);
+await sleep(350);
+await evaluate(`(() => {
+  const head = [...document.querySelectorAll('.sub-head.sorting')].find((h) => h.textContent.includes('生日'));
+  head.querySelector('[data-act="move-cat"][data-dir="-1"]').click();
+})()`);
+await sleep(350);
+await evaluate("document.querySelector('[data-act=\"sort-done\"]').click()");
+await sleep(300);
+const sortState = await getState();
+results.sortEventOrderSaved = sortState.events.find((e) => e.id === 'e2').order < sortState.events.find((e) => e.id === 'e1').order;
+results.sortRootOrderSaved = sortState.cats.filter((c) => !c.parent).map((c) => c.name)[0] === '家人';
+results.sortSubOrderSaved = sortState.cats.filter((c) => c.parent === 'c_life').map((c) => c.name)[0] === '生日';
+await reloadAndWait();
+results.sortFolderAfterReload = await evaluate("document.querySelector('.folder-name')?.textContent");
+results.sortEventsAfterReload = await evaluate(`(() => {
+  const folder = [...document.querySelectorAll('.folder')].find((f) => f.querySelector('.folder-name')?.textContent === '生活');
+  return [...folder.querySelectorAll('.event-name')].map((e) => e.textContent);
+})()`);
+results.sortSubsAfterReload = await evaluate(`(() => {
+  const folder = [...document.querySelectorAll('.folder')].find((f) => f.querySelector('.folder-name')?.textContent === '生活');
+  return [...folder.querySelectorAll('.sub-name')].map((e) => e.textContent);
+})()`);
 await evaluate("localStorage.clear()");
 
 results.errors = errors;

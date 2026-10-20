@@ -93,7 +93,32 @@ function sortValue(ev) {
 }
 
 function sortEvents(a, b) {
+  const ao = a.order;
+  const bo = b.order;
+  if (ao != null || bo != null) {
+    if (ao == null) return 1;
+    if (bo == null) return -1;
+    if (ao !== bo) return ao - bo;
+  }
   return sortValue(a) - sortValue(b) || a.name.localeCompare(b.name, 'zh-Hans-CN');
+}
+
+/* 事件在首页上出现的那个列表（一级分类下的直属日子、某个二级分类、或未分类） */
+function listForEvent(ev, excludeId = null) {
+  const keep = (e) => e.id !== excludeId;
+  const root = state.cats.find((c) => c.id === ev.cat1 && !c.parent);
+  if (!root) {
+    return state.events
+      .filter((e) => keep(e) && !state.cats.some((c) => !c.parent && c.id === e.cat1))
+      .sort(sortEvents);
+  }
+  const sub = ev.cat2 && state.cats.find((c) => c.id === ev.cat2 && c.parent === root.id);
+  if (sub) {
+    return state.events.filter((e) => keep(e) && e.cat1 === root.id && e.cat2 === sub.id).sort(sortEvents);
+  }
+  return state.events
+    .filter((e) => keep(e) && e.cat1 === root.id && !state.cats.some((c) => c.id === e.cat2 && c.parent === root.id))
+    .sort(sortEvents);
 }
 
 const shortDate = (str) => {
@@ -138,6 +163,7 @@ function defaultCats() {
 }
 
 function normalizeEvent(ev) {
+  const order = ev.order == null ? null : Number(ev.order);
   return {
     id: ev.id || uid('e_'),
     name: String(ev.name || '').slice(0, 24),
@@ -146,6 +172,7 @@ function normalizeEvent(ev) {
     cat2: ev.cat2 || null,
     repeatYearly: !!ev.repeatYearly,
     note: String(ev.note || '').slice(0, 140),
+    order: Number.isFinite(order) ? order : null,
     createdAt: ev.createdAt || Date.now()
   };
 }
@@ -686,6 +713,7 @@ function togglePasswordVisible() {
 /* ---------------------------- 视图与弹层 ---------------------------- */
 
 let view = 'home';
+let sorting = false;
 const layerStack = [];
 let currentDetailId = null;
 let editor = null;
@@ -736,6 +764,10 @@ function switchView(next) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
+  if (sorting && next !== 'home') {
+    sorting = false;
+    renderHome();
+  }
   view = next;
   $('#viewHome').hidden = next !== 'home';
   $('#viewCats').hidden = next !== 'cats';
@@ -763,7 +795,7 @@ function buildGroups() {
   lv1.forEach((cat) => {
     const all = state.events.filter((e) => e.cat1 === cat.id);
     if (!all.length) return;
-    const own = all.filter((e) => !e.cat2 || !state.cats.some((c) => c.id === e.cat2 && c.parent === cat.id)).sort(sortEvents);
+    const own = all.filter((e) => !state.cats.some((c) => c.id === e.cat2 && c.parent === cat.id)).sort(sortEvents);
     const subs = state.cats
       .filter((c) => c.parent === cat.id)
       .map((sub) => ({ cat: sub, events: all.filter((e) => e.cat2 === sub.id).sort(sortEvents) }))
@@ -818,7 +850,14 @@ function heroHTML() {
   </div>`;
 }
 
-function eventHTML(ev) {
+function sortArrowsHTML(kind, id, first, last) {
+  const arrow = (dir, path, label, disabled) => `<button class="sort-btn" data-act="move-${kind}" data-id="${id}" data-dir="${dir}" aria-label="${label}"${disabled ? ' disabled' : ''}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>
+    </button>`;
+  return `<span class="sort-btns">${arrow(-1, 'm6 14.5 6-6 6 6', '上移', first)}${arrow(1, 'm6 9.5 6 6 6-6', '下移', last)}</span>`;
+}
+
+function eventHTML(ev, sortMeta) {
   const info = infoOf(ev);
   const meta = ev.repeatYearly
     ? `${shortDate(ev.date)} · 每年`
@@ -831,43 +870,70 @@ function eventHTML(ev) {
   } else {
     countHTML = `<div class="event-count past"><span class="n">${info.days}</span><span class="u">天前</span></div>`;
   }
-  return `<button class="event" data-act="open-event" data-id="${ev.id}">
-    <div class="event-main">
+  const body = `<div class="event-main">
       <div class="event-name"><span>${esc(ev.name)}</span>${ev.repeatYearly ? '<span class="tag">每年</span>' : ''}</div>
       <div class="event-meta">${meta}</div>
     </div>
-    ${countHTML}
-  </button>`;
+    ${countHTML}`;
+  if (sortMeta) {
+    return `<div class="event sorting" data-id="${ev.id}">${body}${sortArrowsHTML('event', ev.id, sortMeta.first, sortMeta.last)}</div>`;
+  }
+  return `<button class="event" data-act="open-event" data-id="${ev.id}">${body}</button>`;
 }
 
-function subfolderHTML(sub) {
+function subfolderHTML(sub, sortMeta) {
   const key = `s:${sub.cat.id}`;
-  const open = !isCollapsed(key);
-  return `<div class="subfolder" data-open="${open}">
-    <button class="sub-head" data-act="toggle-sub" data-key="${key}" aria-expanded="${open}">
-      <span class="sub-dash"></span>
-      <span class="sub-name">${esc(sub.cat.name)}</span>
-      <span class="sub-count">${sub.events.length}</span>
-      ${ICONS.chevron}
-    </button>
-    <div class="folder-body"><div class="folder-inner"><div class="events">${sub.events.map(eventHTML).join('')}</div></div></div>
+  const open = !!sortMeta || !isCollapsed(key);
+  const head = sortMeta
+    ? `<div class="sub-head sorting">
+        <span class="sub-dash"></span>
+        <span class="sub-name">${esc(sub.cat.name)}</span>
+        <span class="sub-count">${sub.events.length}</span>
+        ${sortArrowsHTML('cat', sub.cat.id, sortMeta.first, sortMeta.last)}
+      </div>`
+    : `<button class="sub-head" data-act="toggle-sub" data-key="${key}" aria-expanded="${open}">
+        <span class="sub-dash"></span>
+        <span class="sub-name">${esc(sub.cat.name)}</span>
+        <span class="sub-count">${sub.events.length}</span>
+        ${ICONS.chevron}
+      </button>`;
+  const events = sub.events
+    .map((ev, i) => eventHTML(ev, sortMeta ? { first: i === 0, last: i === sub.events.length - 1 } : null))
+    .join('');
+  return `<div class="subfolder" data-open="${open}">${head}
+    <div class="folder-body"><div class="folder-inner"><div class="events">${events}</div></div></div>
   </div>`;
 }
 
-function groupHTML(group) {
-  const open = !isCollapsed(group.key);
+function groupHTML(group, sortMeta) {
+  const open = !!sortMeta || !isCollapsed(group.key);
   const name = group.cat ? group.cat.name : '未分类';
   const color = group.cat ? group.cat.color : '#B3A897';
   let inner = '';
-  if (group.own.length) inner += `<div class="events">${group.own.map(eventHTML).join('')}</div>`;
-  inner += group.subs.map(subfolderHTML).join('');
+  if (group.own.length) {
+    const events = group.own
+      .map((ev, i) => eventHTML(ev, sortMeta ? { first: i === 0, last: i === group.own.length - 1 } : null))
+      .join('');
+    inner += `<div class="events">${events}</div>`;
+  }
+  inner += group.subs
+    .map((sub, i) => subfolderHTML(sub, sortMeta ? { first: i === 0, last: i === group.subs.length - 1 } : null))
+    .join('');
+  const head = sortMeta
+    ? `<div class="folder-head sorting">
+        <span class="folder-swatch" style="--c:${color}"></span>
+        <span class="folder-name">${esc(name)}</span>
+        <span class="folder-count">${group.events.length} 个</span>
+        ${group.cat ? sortArrowsHTML('cat', group.cat.id, sortMeta.first, sortMeta.last) : ''}
+      </div>`
+    : `<button class="folder-head" data-act="toggle-folder" data-key="${group.key}" aria-expanded="${open}">
+        <span class="folder-swatch" style="--c:${color}"></span>
+        <span class="folder-name">${esc(name)}</span>
+        <span class="folder-count">${group.events.length} 个</span>
+        ${ICONS.chevron}
+      </button>`;
   return `<section class="folder" data-open="${open}" data-key="${group.key}">
-    <button class="folder-head" data-act="toggle-folder" data-key="${group.key}" aria-expanded="${open}">
-      <span class="folder-swatch" style="--c:${color}"></span>
-      <span class="folder-name">${esc(name)}</span>
-      <span class="folder-count">${group.events.length} 个</span>
-      ${ICONS.chevron}
-    </button>
+    ${head}
     <div class="folder-body"><div class="folder-inner"><div class="folder-pad">${inner}</div></div></div>
   </section>`;
 }
@@ -924,19 +990,33 @@ function renderTopbar() {
 function renderHome() {
   const host = $('#homeContent');
   if (!state.events.length) {
+    sorting = false;
     host.innerHTML = emptyHomeHTML();
     return;
   }
   const groups = buildGroups();
+  const rootGroups = groups.filter((group) => group.cat);
   const anyOpen = groups.some(
     (g) => !isCollapsed(g.key) || g.subs.some((sub) => !isCollapsed(`s:${sub.cat.id}`))
   );
-  host.innerHTML = `${heroHTML()}
-    <div class="section-head">
+  const actions = sorting
+    ? '<button class="link-btn sort-done" data-act="sort-done">完成</button>'
+    : `<button class="link-btn" data-act="sort-start">排序</button>
+      <span class="action-sep" aria-hidden="true">·</span>
+      <button class="link-btn" data-act="toggle-all">${anyOpen ? '全部收起' : '全部展开'}</button>`;
+  const groupHTMLs = groups.map((group) => {
+    if (!sorting) return groupHTML(group, null);
+    if (!group.cat) return groupHTML(group, {});
+    const index = rootGroups.indexOf(group);
+    return groupHTML(group, { first: index === 0, last: index === rootGroups.length - 1 });
+  });
+  host.innerHTML = `${sorting ? '' : heroHTML()}
+    <div class="section-head${sorting ? ' sorting' : ''}">
       <h2>我的日子<span class="sub">共 ${state.events.length} 个</span></h2>
-      <button class="link-btn" data-act="toggle-all">${anyOpen ? '全部收起' : '全部展开'}</button>
+      <div class="section-actions">${actions}</div>
     </div>
-    ${groups.map(groupHTML).join('')}`;
+    ${sorting ? '<p class="sort-note">点 ↑ ↓ 调整文件夹和日子的顺序，完成后自动保存。</p>' : ''}
+    ${groupHTMLs.join('')}`;
 }
 
 function updateToggleAllLabel() {
@@ -974,7 +1054,7 @@ function renderCats() {
   const host = $('#catsContent');
   const lv1 = state.cats.filter((c) => !c.parent);
   if (!lv1.length) {
-    host.innerHTML = `<p class="cat-intro">两级分类：一级分类是首页的文件夹，二级分类是文件夹里的小分组。</p>
+    host.innerHTML = `<p class="cat-intro">两级分类：一级分类是首页的文件夹，二级分类是文件夹里的小分组。首页点「排序」可以调整顺序。</p>
       <div class="empty">
         <div class="empty-mark">目</div>
         <h3>还没有分类</h3>
@@ -996,7 +1076,7 @@ function renderCats() {
       </div>`;
     })
     .join('');
-  host.innerHTML = `<p class="cat-intro">两级分类：一级分类是首页的文件夹，二级分类是文件夹里的小分组。点文件夹可以展开或收起。</p>
+  host.innerHTML = `<p class="cat-intro">两级分类：一级分类是首页的文件夹，二级分类是文件夹里的小分组。点文件夹可以展开或收起；文件夹和日子的顺序在首页点「排序」调整。</p>
     ${cards}
     <button class="cat-add" data-act="add-cat1">${ICONS.plus} 新建一级分类</button>`;
 }
@@ -1267,6 +1347,15 @@ function saveEditor() {
     createdAt: Date.now()
   };
   const isEdit = !!editor.id;
+  const existing = isEdit ? state.events.find((e) => e.id === payload.id) : null;
+  const list = listForEvent(payload, payload.id);
+  const ordered = list.map((e) => e.order).filter((n) => n != null);
+  if (ordered.length) {
+    const sameList = existing && existing.cat1 === payload.cat1 && existing.cat2 === payload.cat2;
+    payload.order = sameList && existing.order != null ? existing.order : Math.max(...ordered) + 1;
+  } else {
+    payload.order = null;
+  }
   const idx = state.events.findIndex((e) => e.id === payload.id);
   if (idx > -1) {
     payload.createdAt = state.events[idx].createdAt;
@@ -1451,6 +1540,45 @@ function toggleAll() {
   renderHome();
 }
 
+function moveEventOrder(id, dir) {
+  const ev = state.events.find((e) => e.id === id);
+  if (!ev) return;
+  const list = listForEvent(ev);
+  const index = list.findIndex((e) => e.id === id);
+  const next = index + dir;
+  if (index < 0 || next < 0 || next >= list.length) return;
+  [list[index], list[next]] = [list[next], list[index]];
+  list.forEach((item, i) => {
+    item.order = i;
+  });
+  persist();
+  renderHome();
+}
+
+function moveCatOrder(id, dir) {
+  const cat = state.cats.find((c) => c.id === id);
+  if (!cat) return;
+  const groups = buildGroups();
+  let siblings;
+  if (cat.parent) {
+    const group = groups.find((g) => g.cat && g.cat.id === cat.parent);
+    siblings = group ? group.subs.map((sub) => sub.cat) : [];
+  } else {
+    siblings = groups.filter((g) => g.cat).map((g) => g.cat);
+  }
+  const index = siblings.findIndex((c) => c.id === id);
+  const next = index + dir;
+  if (index < 0 || next < 0 || next >= siblings.length) return;
+  const other = siblings[next];
+  const a = state.cats.indexOf(cat);
+  const b = state.cats.indexOf(other);
+  state.cats[a] = other;
+  state.cats[b] = cat;
+  persist();
+  renderCats();
+  renderHome();
+}
+
 document.addEventListener('click', (event) => {
   const tab = event.target.closest('.tab');
   if (tab) {
@@ -1471,6 +1599,20 @@ document.addEventListener('click', (event) => {
       break;
     case 'toggle-all':
       toggleAll();
+      break;
+    case 'sort-start':
+      sorting = true;
+      renderHome();
+      break;
+    case 'sort-done':
+      sorting = false;
+      renderHome();
+      break;
+    case 'move-cat':
+      moveCatOrder(el.dataset.id, Number(el.dataset.dir));
+      break;
+    case 'move-event':
+      moveEventOrder(el.dataset.id, Number(el.dataset.dir));
       break;
     case 'open-event':
       openDetail(el.dataset.id);

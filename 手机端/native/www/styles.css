@@ -312,7 +312,7 @@ svg {
 }
 
 .hero::before {
-  content: "鏃?;
+  content: "日";
   position: absolute;
   right: -14px;
   top: -50px;
@@ -483,6 +483,88 @@ svg {
 
 .link-btn:active {
   color: var(--accent);
+}
+
+.section-actions {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: none;
+}
+
+.section-actions .action-sep {
+  font-size: 9px;
+  color: #d8cdba;
+}
+
+.link-btn.sort-done {
+  padding: 4px 9px;
+  border-radius: 8px;
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-soft);
+}
+
+.section-head.sorting h2 {
+  color: var(--accent);
+}
+
+.sort-note {
+  margin: -2px 2px 10px;
+  font-size: 10.5px;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.sort-btns {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 2px;
+}
+
+.sort-btn {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.sort-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sort-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.sort-btn:disabled {
+  color: #cfc4b3;
+  background: #f6f1e9;
+  opacity: 0.7;
+  cursor: default;
+}
+
+.sub-head .sort-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+
+.sub-head .sort-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.event.sorting .event-count {
+  display: none;
 }
 
 /* ---------------- folders ---------------- */
