@@ -1020,6 +1020,11 @@ svg {
   height: 15px;
 }
 
+.mini-btn.add svg {
+  width: 16px;
+  height: 16px;
+}
+
 .cat-subs {
   margin: 0 0 2px 13px;
   padding-left: 13px;
@@ -1771,10 +1776,88 @@ svg {
   letter-spacing: 0.05em;
 }
 
+.cal-grid-wrap {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   row-gap: 1px;
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease;
+  will-change: transform, opacity;
+}
+
+.cal-grid.dragging {
+  transition: none;
+}
+
+.cal-ghost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cal-grid.cal-in-right {
+  animation: cal-in-right 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cal-grid.cal-in-left {
+  animation: cal-in-left 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cal-grid.cal-out-left {
+  animation: cal-out-left 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.cal-grid.cal-out-right {
+  animation: cal-out-right 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes cal-in-right {
+  from {
+    transform: translateX(34px);
+    opacity: 0.3;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes cal-in-left {
+  from {
+    transform: translateX(-34px);
+    opacity: 0.3;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes cal-out-left {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-34px);
+    opacity: 0.3;
+  }
+}
+
+@keyframes cal-out-right {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(34px);
+    opacity: 0.3;
+  }
 }
 
 .cal-cell {

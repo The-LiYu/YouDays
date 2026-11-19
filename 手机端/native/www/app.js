@@ -1796,6 +1796,7 @@ function catRowHTML(cat, isSub) {
       <b>${esc(cat.name)}</b>
       <small>${detail}</small>
     </div>
+    <button class="mini-btn add" data-act="new-in-cat" data-cat1="${isSub ? cat.parent : cat.id}" data-cat2="${isSub ? cat.id : ''}" aria-label="在${esc(cat.name)}下新建日子">${ICONS.plus}</button>
     <button class="mini-btn" data-act="edit-cat" data-id="${cat.id}" aria-label="编辑${esc(cat.name)}">${ICONS.edit}</button>
     <button class="mini-btn del" data-act="delete-cat" data-id="${cat.id}" aria-label="删除${esc(cat.name)}">${ICONS.trash}</button>
   </div>`;
@@ -2234,11 +2235,7 @@ function renderLunarPanel() {
   $('#lunarNote').textContent = notes.join(' ');
 }
 
-function renderCalendar() {
-  if (!editor) return;
-  const { viewY, viewM } = editor;
-  $('#calTitle').textContent = `${viewY}年${viewM}月`;
-
+function calendarCellsHTML(viewY, viewM) {
   const firstWeekday = new Date(Date.UTC(viewY, viewM - 1, 1)).getUTCDay();
   const lead = (firstWeekday + 6) % 7;
   const today = todayStr();
@@ -2259,9 +2256,132 @@ function renderCalendar() {
       ${marked ? '<i class="dot"></i>' : ''}
     </button>`);
   }
-  $('#calGrid').innerHTML = cells.join('');
+  return { html: cells.join(''), monthMarks };
+}
+
+function renderCalendar(dir = 0) {
+  if (!editor) return;
+  const { viewY, viewM } = editor;
+  $('#calTitle').textContent = `${viewY}年${viewM}月`;
+  const grid = $('#calGrid');
+  const wrap = $('#calGridWrap');
+  grid.classList.remove('cal-in-left', 'cal-in-right', 'dragging');
+  grid.style.transform = '';
+  grid.style.opacity = '';
+  if (dir && wrap) {
+    const ghost = document.createElement('div');
+    ghost.className = `cal-grid cal-ghost ${dir > 0 ? 'cal-out-left' : 'cal-out-right'}`;
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.innerHTML = grid.innerHTML;
+    wrap.appendChild(ghost);
+    setTimeout(() => ghost.remove(), 320);
+  }
+  const { html, monthMarks } = calendarCellsHTML(viewY, viewM);
+  grid.innerHTML = html;
+  if (dir) {
+    void grid.offsetWidth;
+    grid.classList.add(dir > 0 ? 'cal-in-right' : 'cal-in-left');
+  }
   const noun = editor.kind === 'birthday' ? '生日' : '日子';
   $('#calEventsHint').textContent = monthMarks ? `本月 ${monthMarks} 个${noun}` : `本月暂无${noun}`;
+}
+
+/* 日历左右滑动切换月份：拖动时轻微跟手，松手超过阈值翻页 */
+function shiftCalendarMonth(step) {
+  if (!editor) return;
+  let m = editor.viewM + step;
+  let y = editor.viewY;
+  if (m < 1) {
+    m = 12;
+    y -= 1;
+  } else if (m > 12) {
+    m = 1;
+    y += 1;
+  }
+  editor.viewM = m;
+  editor.viewY = Math.min(2100, Math.max(1900, y));
+  renderCalendar(step);
+  if (!$('#jumpPanel').hidden) renderJump();
+}
+
+let calDrag = null;
+let calSwipeGuard = 0;
+
+function bindCalendarSwipe() {
+  const wrap = $('#calGridWrap');
+  const grid = $('#calGrid');
+  if (!wrap || !grid) return;
+  const reset = () => {
+    grid.classList.remove('dragging');
+    grid.style.transform = '';
+    grid.style.opacity = '';
+    calDrag = null;
+  };
+  wrap.addEventListener(
+    'click',
+    (event) => {
+      // 拖动结束后浏览器仍可能补发 click，吞掉它，避免误选日期
+      if (!calSwipeGuard || Date.now() - calSwipeGuard > 500) return;
+      calSwipeGuard = 0;
+      event.stopPropagation();
+      event.preventDefault();
+    },
+    true
+  );
+  wrap.addEventListener('pointerdown', (event) => {
+    // 新的按下说明是用户主动点击，取消上一次拖动留下的点击拦截
+    calSwipeGuard = 0;
+    if (!editor || !editor.calOpen) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    calDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, dx: 0, active: false, locked: false };
+  });
+  wrap.addEventListener('pointermove', (event) => {
+    if (!calDrag || (calDrag.id !== undefined && event.pointerId !== calDrag.id)) return;
+    const dx = event.clientX - calDrag.x;
+    const dy = event.clientY - calDrag.y;
+    if (!calDrag.active) {
+      if (calDrag.locked || (Math.abs(dx) < 10 && Math.abs(dy) < 10)) return;
+      if (Math.abs(dy) >= Math.abs(dx)) {
+        calDrag.locked = true;
+        return;
+      }
+      calDrag.active = true;
+      grid.classList.add('dragging');
+      try {
+        wrap.setPointerCapture(event.pointerId);
+      } catch (err) {
+        /* 指针已失效时忽略 */
+      }
+    }
+    calDrag.dx = dx;
+    const capped = Math.max(-64, Math.min(64, dx)) * 0.5;
+    grid.style.transform = `translateX(${capped.toFixed(1)}px)`;
+    grid.style.opacity = String(Math.max(0.72, 1 - Math.abs(capped) / 180));
+  });
+  const finish = (event) => {
+    if (!calDrag) return;
+    if (calDrag.id !== undefined && event.pointerId !== calDrag.id) return;
+    const dx = calDrag.dx;
+    const active = calDrag.active;
+    calDrag = null;
+    if (!active) return;
+    calSwipeGuard = Date.now();
+    grid.classList.remove('dragging');
+    grid.style.transform = '';
+    grid.style.opacity = '';
+    if (Math.abs(dx) >= 48) shiftCalendarMonth(dx < 0 ? 1 : -1);
+  };
+  wrap.addEventListener('pointerup', finish);
+  wrap.addEventListener('pointercancel', () => {
+    if (calDrag && calDrag.active) reset();
+    else calDrag = null;
+  });
+  wrap.addEventListener('lostpointercapture', (event) => {
+    // 触摸按下时浏览器会把指针隐式捕获到某个日期按钮上，我们改为捕获到 wrap 时
+    // 该按钮会先抛 lostpointercapture 并冒泡到这里，那不是拖动结束。
+    if (event.target !== wrap) return;
+    if (calDrag && calDrag.active) reset();
+  });
 }
 
 /* 农历日子在某个公历年份里落在哪一天（跨年农历月会落在次年年初） */
@@ -2879,23 +2999,9 @@ document.addEventListener('click', (event) => {
       break;
 
     case 'cal-prev':
-    case 'cal-next': {
-      const step = act === 'cal-prev' ? -1 : 1;
-      let m = editor.viewM + step;
-      let y = editor.viewY;
-      if (m < 1) {
-        m = 12;
-        y -= 1;
-      } else if (m > 12) {
-        m = 1;
-        y += 1;
-      }
-      editor.viewM = m;
-      editor.viewY = Math.min(2100, Math.max(1900, y));
-      renderCalendar();
-      if (!$('#jumpPanel').hidden) renderJump();
+    case 'cal-next':
+      shiftCalendarMonth(act === 'cal-prev' ? -1 : 1);
       break;
-    }
     case 'cal-jump':
       toggleJump();
       break;
@@ -3105,4 +3211,5 @@ if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App
 
 /* ---------------------------- 启动 ---------------------------- */
 
+bindCalendarSwipe();
 renderAll();

@@ -305,6 +305,64 @@ results.calendarCells = await evaluate("document.querySelectorAll('.cal-cell').l
 results.pickedTag = await evaluate("document.querySelector('.picked-tag')?.textContent");
 await shot('03-editor');
 
+// 日历左右滑动 / 箭头切换月份（用真实触摸事件，验证 WebView 里的指针捕获行为）
+const calRect = await evaluate(`(() => {
+  const b = document.querySelector('#calGridWrap').getBoundingClientRect();
+  return { left: Math.round(b.left), top: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height) };
+})()`);
+const calY = calRect.top + Math.min(calRect.h / 2, 120);
+async function touchDrag(x0, y0, x1, y1, onMid) {
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y: y0, id: 1, radiusX: 2, radiusY: 2, force: 1 }] });
+  for (let i = 1; i <= 8; i += 1) {
+    const x = x0 + ((x1 - x0) * i) / 8;
+    const y = y0 + ((y1 - y0) * i) / 8;
+    await sleep(20);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y, id: 1, radiusX: 2, radiusY: 2, force: 1 }] });
+    if (i === 4 && onMid) await onMid();
+  }
+  await sleep(30);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await sleep(420);
+}
+const calTitle = () => evaluate("document.querySelector('#calTitle').textContent");
+const calSwipeFrom = calRect.left + calRect.w - 40;
+const calSwipeTo = calRect.left + 40;
+results.calTitleStart = await calTitle();
+await touchDrag(calSwipeFrom, calY, calSwipeTo, calY, async () => {
+  results.calDragFollow = await evaluate(`(() => {
+    const grid = document.querySelector('#calGrid');
+    return { transform: grid.style.transform, opacity: grid.style.opacity, dragging: grid.classList.contains('dragging') };
+  })()`);
+});
+results.calTitleAfterSwipeLeft = await calTitle();
+results.calDateAfterSwipe = await evaluate("editor.date === todayStr()");
+await touchDrag(calSwipeTo, calY, calSwipeFrom, calY);
+results.calTitleAfterSwipeRight = await calTitle();
+await evaluate("document.querySelector('[data-act=\"cal-next\"]').click()");
+results.calGhostDuringAnim = await evaluate("document.querySelectorAll('.cal-ghost').length");
+await sleep(400);
+results.calTitleAfterNext = await calTitle();
+results.calCellsAfterShift = await evaluate("document.querySelectorAll('#calGrid .cal-cell').length");
+results.calGhostAfterAnim = await evaluate("document.querySelectorAll('.cal-ghost').length");
+await shot('18-cal-swipe');
+await evaluate("document.querySelector('[data-act=\"cal-prev\"]').click()");
+await sleep(400);
+results.calTitleBack = await calTitle();
+
+// 竖向滑动不翻月，横向滑动后轻点仍能选日期
+await touchDrag(calRect.left + calRect.w / 2, calY, calRect.left + calRect.w / 2, calY + 110);
+results.calVerticalSwipeTitle = await calTitle();
+results.calVerticalSwipePicked = await evaluate("editor.date === todayStr()");
+await evaluate(`(() => {
+  const cells = [...document.querySelectorAll('.cal-cell:not(.out)')];
+  const today = new Date().getDate();
+  const target = cells.find((c) => Number(c.textContent) > today) || cells[cells.length - 1];
+  target.click();
+})()`);
+await sleep(300);
+results.calTapAfterSwipe = await evaluate("editor.date !== todayStr()");
+await evaluate("pickDate(todayStr())");
+
 // 选日期 + 填名称 + 分类 + 每年
 await evaluate(`(() => {
   const cells = [...document.querySelectorAll('.cal-cell:not(.out)')];
@@ -344,7 +402,41 @@ await evaluate("document.querySelector('.tab[data-view=\"cats\"]').click()");
 await sleep(500);
 results.catCards = await evaluate("document.querySelectorAll('.cat-card').length");
 results.catRows = await evaluate("document.querySelectorAll('.cat-row').length");
+results.catAddCount = await evaluate("document.querySelectorAll('.cat-row .mini-btn.add').length");
+results.catAddLayout = await evaluate(`(() => {
+  const row = document.querySelector('.cat-row');
+  const add = row.querySelector('.mini-btn.add');
+  const del = row.querySelector('.mini-btn.del');
+  const a = add.getBoundingClientRect();
+  const d = del.getBoundingClientRect();
+  return { visible: a.width > 0 && a.height > 0, beforeDelete: a.left < d.left, overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+})()`);
 await shot('05-cats');
+await evaluate("document.querySelector('.cat-row .mini-btn.add').click()");
+await sleep(450);
+results.catAddPreset = await evaluate(`(() => {
+  const active = document.querySelector('#chip1 .chip.on');
+  return { open: !!document.querySelector('#editorLayer.open'), active: active ? active.textContent.trim() : null };
+})()`);
+await evaluate("document.querySelector('[data-act=\"editor-close\"]').click()");
+await sleep(350);
+await evaluate("document.querySelector('.cat-row.sub .mini-btn.add').click()");
+await sleep(450);
+await evaluate("document.querySelector('#fieldCat1').scrollIntoView({ block: 'center' })");
+await sleep(350);
+results.catSubAddPreset = await evaluate(`(() => {
+  const c1 = document.querySelector('#chip1 .chip.on');
+  const c2 = document.querySelector('#chip2 .chip.on');
+  const cat = state.cats.find((c) => c.id === editor.cat2);
+  return {
+    cat1: c1 ? c1.textContent.trim() : null,
+    cat2: c2 ? c2.textContent.trim() : null,
+    parentMatched: !!cat && cat.parent === editor.cat1
+  };
+})()`);
+await shot('05b-cat-add-editor');
+await evaluate("document.querySelector('[data-act=\"editor-close\"]').click()");
+await sleep(350);
 
 // 生日页
 await evaluate("document.querySelector('.tab[data-view=\"birth\"]').click()");
@@ -901,6 +993,22 @@ results.narrowLayout = await evaluate(`(() => {
       return add.left < name.right - 1;
     }),
     viewport: innerWidth
+  };
+})()`);
+await evaluate("document.querySelector('.tab[data-view=\"cats\"]').click()");
+await sleep(450);
+results.narrowCats = await evaluate(`(() => {
+  const rows = [...document.querySelectorAll('.cat-row')];
+  const add = rows[0]?.querySelector('.mini-btn.add');
+  const del = rows[0]?.querySelector('.mini-btn.del');
+  const a = add ? add.getBoundingClientRect() : null;
+  const d = del ? del.getBoundingClientRect() : null;
+  return {
+    rows: rows.length,
+    addCount: document.querySelectorAll('.cat-row .mini-btn.add').length,
+    addInViewport: !!a && a.width > 0 && a.right <= innerWidth,
+    beforeDelete: !!a && !!d && a.left < d.left,
+    overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth
   };
 })()`);
 
