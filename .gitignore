@@ -14,7 +14,6 @@ build-*.log
 
 # 本地构建工具链
 /Env/
-预览/
 /temp/
 _C盘Temp_20261021/
 CLAUDE.md
