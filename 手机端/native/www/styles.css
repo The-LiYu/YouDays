@@ -242,6 +242,26 @@ svg {
   position: relative;
 }
 
+.remind-btn {
+  position: relative;
+}
+
+.bell-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: none;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px #fbf8f3;
+}
+
+.remind-btn[data-on="true"] .bell-dot {
+  display: block;
+}
+
 .sync-dot {
   position: absolute;
   top: 2px;
@@ -988,6 +1008,352 @@ svg {
   height: 15px;
 }
 
+/* ---------------- birthday page ---------------- */
+.birth-hero {
+  position: relative;
+  margin-top: 4px;
+  padding: 18px 19px 16px;
+  border-radius: 24px;
+  overflow: hidden;
+  color: #faf3e7;
+  background:
+    radial-gradient(120% 150% at 88% -30%, #6b5240 0%, #413225 48%, #291f18 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 24px 44px -28px rgba(45, 31, 20, 0.7);
+}
+
+.birth-hero-mark {
+  position: absolute;
+  right: -12px;
+  top: -48px;
+  font-family: var(--serif);
+  font-size: 150px;
+  line-height: 1;
+  color: rgba(248, 240, 226, 0.05);
+  pointer-events: none;
+}
+
+.birth-hero-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: rgba(250, 243, 231, 0.55);
+}
+
+.birth-hero-label::before {
+  content: "";
+  width: 14px;
+  height: 1px;
+  background: rgba(250, 243, 231, 0.35);
+}
+
+.birth-hero-body {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.birth-hero-info {
+  min-width: 0;
+}
+
+.birth-hero-info h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.birth-hero-info p {
+  margin: 7px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: rgba(250, 243, 231, 0.56);
+}
+
+.birth-hero-count {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding-bottom: 2px;
+  color: #fbf3e6;
+}
+
+.birth-hero-count b {
+  font-family: var(--serif);
+  font-size: 45px;
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.birth-hero-count span {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: rgba(250, 243, 231, 0.55);
+}
+
+.birth-hero-count.today b {
+  font-size: 28px;
+  letter-spacing: 0.04em;
+}
+
+.birth-list {
+  background: var(--surface);
+  border: 1px solid rgba(232, 223, 210, 0.9);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 26px -24px rgba(60, 42, 25, 0.6);
+  overflow: hidden;
+}
+
+.birth-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 15px;
+  text-align: left;
+}
+
+.birth-row + .birth-row {
+  border-top: 1px solid var(--line-2);
+}
+
+.birth-row:active {
+  background: #fdfaf5;
+}
+
+.birth-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 600;
+  padding-top: 1px;
+}
+
+.birth-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.birth-main b {
+  display: block;
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.birth-main small {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.birth-days {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  min-width: 52px;
+  justify-content: flex-end;
+  color: var(--accent);
+}
+
+.birth-days .n {
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.birth-days .n.word {
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.birth-days .u {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.page-note {
+  margin: 14px 2px 0;
+  text-align: center;
+  font-size: 10.5px;
+  line-height: 1.65;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+/* ---------------- todo page ---------------- */
+.todo-compose {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.todo-compose input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #e7dfd2;
+  border-radius: 13px;
+  background: var(--surface);
+  padding: 12px 13px;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.todo-compose input::placeholder {
+  color: #bfb5a5;
+  font-size: 13px;
+}
+
+.todo-compose input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(200, 85, 61, 0.09);
+}
+
+.compose-add {
+  flex: none;
+  padding: 0 17px;
+  border-radius: 13px;
+  background: linear-gradient(145deg, #d2664a, #bd4b33);
+  color: #fff8ef;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  box-shadow: 0 10px 18px -12px rgba(190, 74, 51, 0.9);
+  transition: transform 0.16s;
+}
+
+.compose-add:active {
+  transform: scale(0.96);
+}
+
+.todo-card {
+  background: var(--surface);
+  border: 1px solid rgba(232, 223, 210, 0.9);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 26px -24px rgba(60, 42, 25, 0.6);
+  overflow: hidden;
+}
+
+.todo-card.is-empty {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: none;
+}
+
+.todo-empty {
+  margin: 0;
+  padding: 22px 14px;
+  text-align: center;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.todo-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 12px 12px 14px;
+}
+
+.todo-row + .todo-row {
+  border-top: 1px solid var(--line-2);
+}
+
+.todo-check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.6px solid #d8cdba;
+  display: grid;
+  place-items: center;
+  color: transparent;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.14s;
+}
+
+.todo-check svg {
+  width: 12px;
+  height: 12px;
+}
+
+.todo-check:active {
+  transform: scale(0.9);
+}
+
+.todo-check[aria-checked="true"] {
+  background: var(--sage);
+  border-color: var(--sage);
+  color: #fff;
+}
+
+.todo-text {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.todo-row.done .todo-text {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: #c9bfae;
+}
+
+.todo-row .mini-btn {
+  width: 26px;
+  height: 26px;
+  opacity: 0.7;
+}
+
+.todo-row .mini-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.done-card {
+  background: rgba(255, 255, 255, 0.62);
+}
+
 /* ---------------- tab bar ---------------- */
 .tabbar {
   position: fixed;
@@ -1000,7 +1366,7 @@ svg {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 44px 9px;
+  padding: 9px 14px 9px;
   background: rgba(251, 248, 243, 0.93);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
@@ -1012,7 +1378,9 @@ svg {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  width: 76px;
+  flex: 1;
+  width: auto;
+  max-width: 76px;
   padding: 4px 0;
   color: #a99d8b;
   font-size: 9.5px;
@@ -1434,6 +1802,118 @@ svg {
   letter-spacing: 0.02em;
 }
 
+/* ---------------- 公历 / 农历 ---------------- */
+.cal-modes {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 10px;
+  padding: 3px;
+  border-radius: 13px;
+  background: #efe8dc;
+}
+
+.cal-modes .mode {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 10px;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  transition: background 0.2s, color 0.2s;
+}
+
+.cal-modes .mode.on {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(80, 60, 40, 0.08);
+}
+
+.lunar-panel {
+  padding: 14px;
+  border: 1px solid #e7dfd2;
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.lunar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.lunar-title {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  letter-spacing: 0.03em;
+}
+
+.leap-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid #e7dfd2;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.leap-chip[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.lunar-months {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.month-chip {
+  padding: 6px 11px;
+  border-radius: 9px;
+  border: 1px solid #e7dfd2;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+
+.month-chip.on {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+
+.lunar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.day-chip {
+  height: 36px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.day-chip.dim {
+  color: #c6bcae;
+}
+
+.day-chip.on {
+  background: var(--accent);
+  color: #fff;
+}
+
+.lunar-note {
+  margin: 10px 2px 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
 .link {
   font-size: 11px;
   color: var(--accent);
@@ -1475,6 +1955,16 @@ svg {
   font-weight: 400;
   color: var(--ink-2);
   letter-spacing: 0.02em;
+}
+
+.picked-date.lunar {
+  white-space: normal;
+  overflow: visible;
+}
+
+.picked-date.lunar small {
+  display: block;
+  margin: 2px 0 0;
 }
 
 .picked-tag {
@@ -1559,12 +2049,122 @@ svg {
   min-height: 62px;
 }
 
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.time-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.time-clear {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 10px 4px;
+}
+
 .editor-hint {
   margin: 22px 0 6px;
   text-align: center;
   font-size: 10px;
   letter-spacing: 0.06em;
   color: var(--muted);
+}
+
+.birth-preview {
+  margin: 8px 2px 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+.remind-time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 9px 13px;
+  border: 1px solid #e7dfd2;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.remind-time > span {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  letter-spacing: 0.02em;
+}
+
+.remind-time input {
+  width: auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.remind-time input:focus {
+  box-shadow: none;
+}
+
+.field-note {
+  margin: 8px 2px 0;
+  font-size: 10px;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  color: var(--gold);
+}
+
+.remind-mark {
+  flex: none;
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-left: 5px;
+  color: var(--gold);
+  vertical-align: -2px;
+}
+
+.birth-main b .remind-mark {
+  margin-left: 4px;
+}
+
+.chip:disabled {
+  opacity: 0.45;
+}
+
+.notif-perm-btn {
+  margin-top: 10px;
+  padding: 12px;
+  font-size: 13px;
+}
+
+.notify-warn {
+  margin: 12px 2px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f5efe2;
+  color: #8a6f2e;
+  font-size: 10.5px;
+  line-height: 1.7;
+}
+
+.notify-warn .link {
+  padding: 0 3px;
+  font-size: 10.5px;
+  color: var(--gold);
 }
 
 .chips {
@@ -1676,6 +2276,11 @@ svg {
 
 .switch[data-on="true"]::after {
   transform: translateX(17px);
+}
+
+.switch-row.locked {
+  pointer-events: none;
+  background: #fbf6ee;
 }
 
 /* ---------------- buttons ---------------- */

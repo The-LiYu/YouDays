@@ -210,10 +210,14 @@ await evaluate(`(() => {
   const input = document.querySelector('#evName');
   input.value = '同步测试';
   input.dispatchEvent(new Event('input', { bubbles: true }));
+  document.querySelector('[data-act="pick-calendar"][data-cal="lunar"]').click();
+  document.querySelector('[data-act="pick-lunar-month"][data-m="8"]').click();
+  document.querySelector('[data-act="pick-lunar-day"][data-d="15"]').click();
   document.querySelector('#saveBtn').click();
 })()`);
 await sleep(600);
 results.initialEvents = await evaluate("document.querySelectorAll('.event').length");
+results.initialLunar = await evaluate("JSON.parse(localStorage.getItem('youri.state.v1')).events[0].lunar");
 
 // 打开同步
 await evaluate("document.querySelector('[data-act=\"open-sync\"]').click()");
@@ -242,6 +246,7 @@ await evaluate("document.querySelector('[data-act=\"dav-upload\"]').click()");
 await sleep(900);
 results.uploadMsg = await evaluate("document.querySelector('#cloudMsg').textContent");
 results.cloudEvents = stored ? JSON.parse(stored).events.length : 0;
+results.cloudLunar = stored ? JSON.parse(stored).events.find((e) => e.name === '同步测试')?.lunar : null;
 results.uploadStatus = await evaluate("document.querySelector('#cloudStatusTitle').textContent");
 await shot('09-sync-connected');
 
@@ -296,6 +301,7 @@ await evaluate("document.querySelector('[data-act=\"confirm-ok\"]').click()");
 await sleep(900);
 results.eventsAfterRestore = await evaluate("document.querySelectorAll('.event').length");
 results.restoreMsg = await evaluate("document.querySelector('#cloudMsg').textContent");
+results.restoreLunar = await evaluate("JSON.parse(localStorage.getItem('youri.state.v1')).events.find((e) => e.name === '同步测试')?.lunar");
 
 // 断开连接
 await evaluate("document.querySelector('[data-act=\"dav-disconnect\"]').click()");

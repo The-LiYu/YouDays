@@ -135,6 +135,34 @@ await cdp.send('Emulation.setDeviceMetricsOverride', {
   screenHeight: HEIGHT
 });
 await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+
+// 本地通知的模拟实现：浏览器里没有系统通知，用它验证调度逻辑与界面状态
+await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+  source: `(() => {
+    const pending = [];
+    const plugin = {
+      checkPermissions: async () => ({ display: 'granted' }),
+      requestPermissions: async () => ({ display: 'granted' }),
+      checkExactNotificationSetting: async () => ({ exact_alarm: 'granted' }),
+      changeExactNotificationSetting: async () => ({ exact_alarm: 'granted' }),
+      createChannel: async () => {},
+      getPending: async () => ({ notifications: pending.slice() }),
+      cancel: async ({ notifications }) => {
+        (notifications || []).forEach((n) => {
+          const i = pending.findIndex((p) => p.id === n.id);
+          if (i > -1) pending.splice(i, 1);
+        });
+      },
+      schedule: async ({ notifications }) => {
+        (notifications || []).forEach((n) => pending.push(n));
+        return { notifications: [] };
+      },
+      __pending: pending
+    };
+    window.Capacitor = { Plugins: { LocalNotifications: plugin } };
+  })();`
+});
+
 await cdp.send('Page.navigate', { url: `http://127.0.0.1:${PORT}/index.html?demo=1` });
 await loaded;
 await sleep(1000);
@@ -175,6 +203,16 @@ const results = {};
 results.folders = await evaluate("document.querySelectorAll('.folder').length");
 results.events = await evaluate("document.querySelectorAll('.event').length");
 results.hero = await evaluate("document.querySelector('.hero-name')?.textContent");
+const rectScript = `(sel) => { const el = document.querySelector(sel); if (!el) return null; const b = el.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), left: Math.round(b.left), right: Math.round(b.right), w: Math.round(b.width), h: Math.round(b.height) }; }`;
+results.topbarLayout = await evaluate(`(() => {
+  const rect = ${rectScript};
+  return {
+    brand: rect('.brand'),
+    actions: rect('.top-actions'),
+    overflowX: document.documentElement.scrollWidth - innerWidth,
+    pills: document.querySelectorAll('.top-actions .round-btn, .top-actions .stat-pill').length
+  };
+})()`);
 await shot('01-home');
 
 // 首页排序模式
@@ -253,11 +291,15 @@ await evaluate(`(() => {
   const chip = [...document.querySelectorAll('#chip2 .chip')].find(c => c.textContent.includes('旅行'));
   chip?.click();
   document.querySelector('[data-act="toggle-repeat"]').click();
+  const clock = document.querySelector('#evTime');
+  clock.value = '18:00';
+  clock.dispatchEvent(new Event('change', { bubbles: true }));
 })()`);
 await sleep(400);
 await shot('04-editor-filled');
 results.pickedTag2 = await evaluate("document.querySelector('.picked-tag')?.textContent");
 results.chipOn = await evaluate("document.querySelectorAll('.chip.on').length");
+results.timeClearVisible = await evaluate("!document.querySelector('#timeClear').hidden");
 await evaluate("document.querySelector('[data-act=\"editor-close\"]').click()");
 await sleep(350);
 
@@ -267,6 +309,120 @@ await sleep(500);
 results.catCards = await evaluate("document.querySelectorAll('.cat-card').length");
 results.catRows = await evaluate("document.querySelectorAll('.cat-row').length");
 await shot('05-cats');
+
+// 生日页
+await evaluate("document.querySelector('.tab[data-view=\"birth\"]').click()");
+await sleep(500);
+results.birthRows = await evaluate("document.querySelectorAll('.birth-row').length");
+results.birthHero = await evaluate("document.querySelector('.birth-hero-info h2')?.textContent");
+results.birthDays = await evaluate("[...document.querySelectorAll('.birth-days .n')].map((n) => n.textContent.trim())");
+results.birthDaysSorted = results.birthDays.every((v, i, arr) => i === 0 || Number(arr[i - 1]) <= Number(v));
+await shot('11-birthday');
+
+// 新建生日：只填名字，每年重复锁定
+await evaluate("document.querySelector('[data-act=\"new-birthday\"]').click()");
+await sleep(500);
+results.birthRepeatLocked = await evaluate("!document.querySelector('#birthRepeat').hidden && document.querySelector('#repeatRow').hidden");
+results.birthCatHidden = await evaluate("document.querySelector('#fieldCat1').hidden");
+await evaluate(`(() => {
+  const input = document.querySelector('#evName');
+  input.value = '外婆';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.blur();
+})()`);
+await sleep(250);
+results.birthPreview = await evaluate("document.querySelector('#birthPreview')?.textContent");
+await shot('13-birthday-editor');
+await evaluate("document.querySelector('#saveBtn').click()");
+await sleep(600);
+results.birthAfterAdd = await evaluate("document.querySelectorAll('.birth-row').length");
+results.birthViewAfterAdd = await evaluate("!document.querySelector('#viewBirth').hidden");
+results.birthTitleAdded = await evaluate("[...document.querySelectorAll('.birth-main b')].some((e) => e.textContent === '外婆的生日')");
+
+// 待办页
+await evaluate("document.querySelector('.tab[data-view=\"todo\"]').click()");
+await sleep(450);
+results.todoRows = await evaluate("document.querySelectorAll('.todo-row').length");
+await evaluate(`(() => {
+  const input = document.querySelector('#todoInput');
+  input.value = '给外婆打电话';
+  document.querySelector('.compose-add').click();
+})()`);
+await sleep(450);
+results.todoAfterAdd = await evaluate("[...document.querySelectorAll('.todo-row .todo-text')].some((e) => e.textContent.includes('给外婆打电话'))");
+await evaluate("document.querySelector('.todo-text').click()");
+await sleep(450);
+results.todoDone = await evaluate("document.querySelectorAll('.done-card .todo-row').length");
+results.todoOpen = await evaluate("document.querySelectorAll('.todo-card:not(.done-card) .todo-row').length");
+await sleep(1600);
+await shot('12-todo');
+
+// 提醒设置
+await evaluate("document.querySelector('.tab[data-view=\"home\"]').click()");
+await sleep(350);
+await evaluate("document.querySelector('[data-act=\"open-remind\"]').click()");
+await sleep(500);
+results.remindSheetOpen = await evaluate("!!document.querySelector('#remindLayer.open')");
+results.remindStatusTitle = await evaluate("document.querySelector('#notifStatusTitle').textContent");
+results.remindPermBtnHidden = await evaluate("document.querySelector('#notifPermBtn').hidden");
+await evaluate("document.querySelector('[data-act=\"toggle-notify\"]').click()");
+await sleep(900);
+results.remindEnabled = await evaluate("document.querySelector('#notifyRow').getAttribute('aria-checked')");
+results.remindScheduled = await evaluate("window.Capacitor.Plugins.LocalNotifications.__pending.length");
+results.remindStatusAfter = await evaluate("document.querySelector('#notifStatusTitle').textContent");
+results.remindSample = await evaluate("window.Capacitor.Plugins.LocalNotifications.__pending.map((p) => p.body).slice(0, 4)");
+results.remindLayout = await evaluate(`(() => {
+  const rect = ${rectScript};
+  const sheet = document.querySelector('#remindLayer .sheet');
+  return {
+    sheet: rect('#remindLayer .sheet'),
+    scroll: { client: sheet.querySelector('.sheet-scroll').clientHeight, scroll: sheet.querySelector('.sheet-scroll').scrollHeight },
+    toggle: rect('#notifyRow'),
+    time: rect('#notifyTime'),
+    leads: rect('#notifyLeads'),
+    test: rect('#testNotifBtn'),
+    overflowX: document.documentElement.scrollWidth - innerWidth
+  };
+})()`);
+await shot('14-remind');
+await evaluate("document.querySelector('[data-act=\"remind-close\"]').click()");
+await sleep(400);
+
+// 编辑器里的提醒
+await evaluate("document.querySelector('#fabNew').click()");
+await sleep(450);
+results.remindChips = await evaluate("document.querySelectorAll('#remindChips .chip').length");
+await evaluate("(() => { const chip = [...document.querySelectorAll('#remindChips .chip')].find((c) => c.textContent.trim() === '不提醒'); chip.click(); })()");
+await evaluate("(() => { const chip = [...document.querySelectorAll('#remindChips .chip')].find((c) => c.textContent.trim() === '提前 1 天'); chip.click(); })()");
+await evaluate("(() => { const chip = [...document.querySelectorAll('#remindChips .chip')].find((c) => c.textContent.trim() === '提前 3 天'); chip.click(); })()");
+await sleep(300);
+results.remindTimeVisible = await evaluate("!document.querySelector('#remindTimes').hidden");
+results.remindRowCount = await evaluate("document.querySelectorAll('#remindTimes .remind-time').length");
+results.remindDefaultTime = await evaluate("document.querySelector('#remindTimes input[data-lead=\"1\"]').value");
+await evaluate(`(() => {
+  const input = document.querySelector('#remindTimes input[data-lead="3"]');
+  input.value = '20:00';
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+})()`);
+await evaluate("document.querySelector('#remindField').scrollIntoView({ block: 'center' })");
+await sleep(500);
+results.remindEditorLayout = await evaluate(`(() => {
+  const rect = ${rectScript};
+  return {
+    chips: document.querySelectorAll('#remindChips .chip').length,
+    rows: document.querySelectorAll('#remindTimes .remind-time').length,
+    row: rect('#remindTimes .remind-time'),
+    input: rect('#remindTimes input[data-lead="1"]'),
+    label: rect('#remindTimes .remind-time > span'),
+    overflowX: document.documentElement.scrollWidth - innerWidth
+  };
+})()`);
+await shot('15-editor-remind');
+await evaluate("document.querySelector('[data-act=\"editor-close\"]').click()");
+await sleep(350);
+
+await evaluate("document.querySelector('.tab[data-view=\"cats\"]').click()");
+await sleep(400);
 
 if (process.argv.includes('--quick')) {
   results.errors = errors;
@@ -339,6 +495,16 @@ await sleep(900);
 results.emptyState = await evaluate("!!document.querySelector('.empty')");
 await shot('07-empty');
 
+// 生日 / 待办的空状态
+await evaluate("document.querySelector('.tab[data-view=\"birth\"]').click()");
+await sleep(400);
+results.birthEmpty = await evaluate("!!document.querySelector('#viewBirth .empty')");
+await evaluate("document.querySelector('.tab[data-view=\"todo\"]').click()");
+await sleep(400);
+results.todoEmpty = await evaluate("!!document.querySelector('.todo-card.is-empty') && !document.querySelector('.done-card')");
+await evaluate("document.querySelector('.tab[data-view=\"home\"]').click()");
+await sleep(300);
+
 /* ------------------------- 数据与交互回归测试 ------------------------- */
 await evaluate("localStorage.clear()");
 await reloadAndWait();
@@ -357,13 +523,47 @@ await evaluate(`(() => {
   const input = document.querySelector('#evName');
   input.value = '持久化测试';
   input.dispatchEvent(new Event('input', { bubbles: true }));
+  const chip = [...document.querySelectorAll('#remindChips .chip')].find((c) => c.textContent.trim() === '当天');
+  chip.click();
+  const chip2 = [...document.querySelectorAll('#remindChips .chip')].find((c) => c.textContent.trim() === '提前 1 天');
+  chip2.click();
+  const time = document.querySelector('#remindTimes input[data-lead="0"]');
+  time.value = '23:59';
+  time.dispatchEvent(new Event('change', { bubbles: true }));
+  const time2 = document.querySelector('#remindTimes input[data-lead="1"]');
+  time2.value = '08:15';
+  time2.dispatchEvent(new Event('change', { bubbles: true }));
+  const clock = document.querySelector('#evTime');
+  clock.value = '18:40';
+  clock.dispatchEvent(new Event('change', { bubbles: true }));
   document.querySelector('#saveBtn').click();
 })()`);
 await sleep(700);
 const addedState = await getState();
 results.persistedAdd = !!addedState && addedState.events.length === 1 && addedState.events[0].name === '持久化测试';
+results.timeSaved = !!addedState && addedState.events[0].time === '18:40';
+results.remindSaved = !!addedState && JSON.stringify(addedState.events[0].remind) === JSON.stringify({ lead: 0, time: '23:59' });
+results.remindsSaved = !!addedState && JSON.stringify(addedState.events[0].reminds.map((r) => `${r.lead}@${r.time}`)) === JSON.stringify(['0@23:59', '1@08:15']);
+results.remindPlanCount = await evaluate("reminderPlan().length");
+results.remindPlanMatch = await evaluate(`(() => {
+  const s = JSON.parse(localStorage.getItem('youri.state.v1'));
+  const ev = s.events[0];
+  const p = reminderPlan().find((x) => x.title === ev.name);
+  if (!p) return false;
+  const [y, m, d] = ev.date.split('-').map(Number);
+  const expected = new Date(y, m - 1, d, 23, 59, 0, 0).getTime();
+  return Math.abs(p.at - expected) < 1000 && p.body.includes('就是今天');
+})()`);
 await reloadAndWait();
 results.persistedReload = await evaluate("[...document.querySelectorAll('.event-name')].some((e) => e.textContent.includes('持久化测试'))");
+await evaluate("document.querySelector('.event').click()");
+await sleep(400);
+results.detailTimeRow = await evaluate(`(() => {
+  const row = [...document.querySelectorAll('#detailBody .d-row')].find((r) => r.querySelector('span')?.textContent === '截止时刻');
+  return row ? row.querySelector('b').textContent : null;
+})()`);
+await evaluate("document.querySelector('[data-act=\"detail-close\"]').click()");
+await sleep(350);
 
 // 文件夹收起状态持久化
 await evaluate("document.querySelector('.folder-head').click()");
@@ -394,6 +594,7 @@ await evaluate(`(() => {
 })()`);
 await sleep(700);
 results.edited = await evaluate("[...document.querySelectorAll('.event-name')].some((e) => e.textContent.includes('改过的名字'))");
+results.timeKeptAfterEdit = await evaluate("JSON.parse(localStorage.getItem('youri.state.v1')).events[0].time === '18:40'");
 results.assigned = await evaluate("!!document.querySelector('.subfolder .event-name')");
 
 // 删除二级分类：事件应回到一级分类
@@ -493,6 +694,143 @@ results.sortSubsAfterReload = await evaluate(`(() => {
   const folder = [...document.querySelectorAll('.folder')].find((f) => f.querySelector('.folder-name')?.textContent === '生活');
   return [...folder.querySelectorAll('.sub-name')].map((e) => e.textContent);
 })()`);
+await evaluate("localStorage.clear()");
+
+/* ------------------------- 生日 / 待办回归测试 ------------------------- */
+await evaluate(`(() => {
+  localStorage.setItem('youri.state.v1', JSON.stringify({
+    v: 1,
+    cats: [],
+    events: [
+      { id: 'e_past', name: '过去的日子', date: '2020-01-01', cat1: null, cat2: null, repeatYearly: false, note: '', remind: { lead: 0, time: '09:00' }, createdAt: 0 },
+      { id: 'e_lunar', name: '中秋', date: '2026-09-25', lunar: { m: 8, d: 15, leap: false }, cat1: null, cat2: null, repeatYearly: true, note: '', reminds: [{ lead: 1, time: '09:00' }], createdAt: 0 },
+      (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        const ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        return { id: 'e_multi', name: '多提醒测试', date: ds, cat1: null, cat2: null, repeatYearly: false, note: '', reminds: [{ lead: 0, time: '09:00' }, { lead: 3, time: '20:00' }], createdAt: 0 };
+      })()
+    ],
+    birthdays: [
+      { id: 'b1', name: '林小满', date: '1996-11-02', remind: { lead: 7, time: '08:15' }, createdAt: 1 },
+      { id: 'b2', name: '妈妈', date: '1971-12-18', createdAt: 2 },
+      { id: 'b3', name: '外婆', date: '2026-01-26', lunar: { m: 12, d: 8, leap: false }, remind: { lead: 1, time: '08:00' }, createdAt: 3 }
+    ],
+    todos: [
+      { id: 't1', text: '买牛奶', done: false, createdAt: 2 },
+      { id: 't2', text: '已经做完', done: true, createdAt: 1, doneAt: 3 }
+    ],
+    collapsed: {},
+    updatedAt: 0
+  }));
+})()`);
+await reloadAndWait();
+
+// 农历：换算、首页、详情、提醒
+results.lunarNext = await evaluate("nextLunarOccurrence({ m: 8, d: 15, leap: false }).date");
+results.lunarRemindDates = await evaluate("reminderPlan().filter((x) => x.title === '中秋').map((x) => x.date)");
+results.lunarDot = await evaluate("hasEventOn('2027-09-15') && !hasEventOn('2027-09-16')");
+results.lunarMeta = await evaluate(`(() => {
+  const ev = [...document.querySelectorAll('.event')].find((e) => e.textContent.includes('中秋'));
+  return ev ? ev.querySelector('.event-meta').textContent : null;
+})()`);
+await evaluate("[...document.querySelectorAll('.event')].find((e) => e.textContent.includes('中秋')).click()");
+await sleep(400);
+results.lunarDetailRows = await evaluate(`(() => [...document.querySelectorAll('#detailBody .d-row')].slice(0, 2).map((r) => [r.querySelector('span').textContent, r.querySelector('b').textContent]))()`);
+await evaluate("document.querySelector('[data-act=\"detail-close\"]').click()");
+await sleep(350);
+
+// 农历编辑器：切换、选月日、闰月提示（不保存）
+await evaluate("document.querySelector('#fabNew').click()");
+await sleep(450);
+await evaluate("document.querySelector('[data-act=\"pick-calendar\"][data-cal=\"lunar\"]').click()");
+await sleep(300);
+results.lunarModeShown = await evaluate("!document.querySelector('#lunarPanel').hidden && document.querySelector('#calWrap').hidden");
+await evaluate(`(() => {
+  document.querySelector('[data-act="pick-lunar-month"][data-m="8"]').click();
+  document.querySelector('[data-act="pick-lunar-day"][data-d="15"]').click();
+})()`);
+await sleep(300);
+results.lunarEditorDate = await evaluate("editor.date");
+results.lunarEditorPicked = await evaluate("document.querySelector('.picked-date').textContent");
+results.lunarEditorNote = await evaluate("document.querySelector('#lunarNote').textContent");
+await evaluate("document.querySelector('#leapChip').click()");
+await sleep(300);
+results.lunarLeapNote = await evaluate("document.querySelector('#lunarNote').textContent");
+await shot('16-lunar-editor');
+await evaluate(`(() => {
+  document.querySelector('[data-act="toggle-repeat"]').click();
+  const input = document.querySelector('#evName');
+  input.value = '农历测试';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  document.querySelector('#saveBtn').click();
+})()`);
+await sleep(700);
+results.lunarSaved = await evaluate(`(() => {
+  const ev = JSON.parse(localStorage.getItem('youri.state.v1')).events.find((e) => e.name === '农历测试');
+  return ev ? { date: ev.date, lunar: ev.lunar, repeat: ev.repeatYearly } : null;
+})()`);
+await reloadAndWait();
+results.lunarSavedMeta = await evaluate(`(() => {
+  const ev = [...document.querySelectorAll('.event')].find((e) => e.textContent.includes('农历测试'));
+  return ev ? ev.querySelector('.event-meta').textContent : null;
+})()`);
+
+await evaluate("document.querySelector('.tab[data-view=\"birth\"]').click()");
+await sleep(450);
+results.birthPersisted = await evaluate("document.querySelectorAll('.birth-row').length");
+results.birthTitle = await evaluate("document.querySelector('.birth-main b')?.textContent");
+results.lunarBirthRow = await evaluate(`(() => {
+  const row = [...document.querySelectorAll('.birth-row')].find((r) => r.textContent.includes('外婆'));
+  return row ? row.querySelector('.birth-main small').textContent : null;
+})()`);
+results.lunarBirthNext = await evaluate("birthdayInfo(state.birthdays.find((b) => b.id === 'b3')).next");
+results.lunarBirthRemindDates = await evaluate("reminderPlan().filter((x) => x.title === '外婆的生日').map((x) => x.date)");
+results.birthRemindMatch = await evaluate(`(() => {
+  const p = reminderPlan().find((x) => x.title === '林小满的生日');
+  if (!p) return false;
+  const expected = new Date(2026, 10, 2 - 7, 8, 15, 0, 0).getTime();
+  return Math.abs(p.at - expected) < 1000 && p.body.includes('还有 7 天');
+})()`);
+results.pastRemindSkipped = await evaluate("!reminderPlan().some((x) => x.title === '过去的日子')");
+results.multiRemindPlan = await evaluate("reminderPlan().filter((x) => x.title === '多提醒测试').length");
+results.multiRemindDetail = await evaluate(`(() => {
+  openDetail('e_multi');
+  const row = [...document.querySelectorAll('#detailBody .d-row')].find((r) => r.querySelector('span')?.textContent === '提醒');
+  const text = row ? row.querySelector('b').innerText : null;
+  closeDetail();
+  return text;
+})()`);
+
+await evaluate("document.querySelector('.birth-row').click()");
+await sleep(450);
+results.birthEditTitle = await evaluate("document.querySelector('#editorTitle')?.textContent");
+results.birthDeleteVisible = await evaluate("!document.querySelector('#birthDeleteBtn').hidden");
+await evaluate(`(() => {
+  const input = document.querySelector('#evName');
+  input.value = '小满';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  document.querySelector('#saveBtn').click();
+})()`);
+await sleep(600);
+results.birthEdited = await evaluate("[...document.querySelectorAll('.birth-main b')].some((e) => e.textContent.includes('小满的生日'))");
+results.birthRemindKept = await evaluate(`(() => {
+  const s = JSON.parse(localStorage.getItem('youri.state.v1'));
+  const b = s.birthdays.find((x) => x.id === 'b1');
+  return !!b && b.remind.lead === 7 && b.remind.time === '08:15';
+})()`);
+
+await evaluate("document.querySelector('.tab[data-view=\"todo\"]').click()");
+await sleep(450);
+results.todoPersistedDone = await evaluate("document.querySelectorAll('.done-card .todo-row').length");
+await evaluate("document.querySelector('.todo-check').click()");
+await sleep(500);
+results.todoCompleted = await evaluate("document.querySelectorAll('.done-card .todo-row').length");
+await reloadAndWait();
+await evaluate("document.querySelector('.tab[data-view=\"todo\"]').click()");
+await sleep(450);
+results.todoCompletionPersisted = await evaluate("document.querySelectorAll('.done-card .todo-row').length");
+results.todoStatePersisted = await evaluate("JSON.parse(localStorage.getItem('youri.state.v1')).todos.every((t) => typeof t.done === 'boolean')");
 await evaluate("localStorage.clear()");
 
 results.errors = errors;

@@ -40,6 +40,18 @@
     <div id="homeContent"></div>
   </main>
 
+  <main class="view" id="viewBirth" hidden>
+    <div id="birthContent"></div>
+  </main>
+
+  <main class="view" id="viewTodo" hidden>
+    <form class="todo-compose" id="todoCompose" autocomplete="off">
+      <input id="todoInput" type="text" maxlength="80" placeholder="记一件要做的事…" enterkeyhint="done" aria-label="待办内容">
+      <button class="compose-add" type="submit">添加</button>
+    </form>
+    <div id="todoBody"></div>
+  </main>
+
   <main class="view" id="viewCats" hidden>
     <div id="catsContent"></div>
   </main>
@@ -49,8 +61,16 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.2 12 3.5l8.5 6.7"/><path d="M5.5 9.3V20h13V9.3"/><path d="M9.8 20v-5.4h4.4V20"/></svg>
       <span>首页</span>
     </button>
+    <button class="tab" data-view="birth" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 20h15"/><path d="M6.5 20v-5.2a1.6 1.6 0 0 1 1.6-1.6h7.8a1.6 1.6 0 0 1 1.6 1.6V20"/><path d="M12 13.2V9.4"/><path d="M8.8 13.2V10.6"/><path d="M15.2 13.2V10.6"/><path d="M12 7.6c.8.9.8 1.8 0 1.8s-.8-.9 0-1.8Z"/></svg>
+      <span>生日</span>
+    </button>
     <button class="fab" id="fabNew" aria-label="新建日子">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"/></svg>
+    </button>
+    <button class="tab" data-view="todo" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.4h6a1 1 0 0 1 1 1v1.2H8V5.4a1 1 0 0 1 1-1Z"/><path d="M8 5.2H6.4a1.8 1.8 0 0 0-1.8 1.8v11.2a1.8 1.8 0 0 0 1.8 1.8h11.2a1.8 1.8 0 0 0 1.8-1.8V7a1.8 1.8 0 0 0-1.8-1.8H16"/><path d="m8.6 13.2 1.7 1.7 3.6-3.9"/><path d="M13.4 16.6h3.2"/></svg>
+      <span>待办</span>
     </button>
     <button class="tab" data-view="cats" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 21 8l-9 4.8L3 8l9-4.8Z"/><path d="m3 12.6 9 4.8 9-4.8"/><path d="m3 17 9 4.8 9-4.8"/></svg>
@@ -68,6 +88,10 @@
       <span class="head-ghost"></span>
     </header>
     <div class="sheet-scroll" id="editorScroll">
+      <div class="cal-modes" role="group" aria-label="日期类型">
+        <button type="button" class="mode" data-act="pick-calendar" data-cal="solar" id="modeSolar" aria-pressed="true">公历</button>
+        <button type="button" class="mode" data-act="pick-calendar" data-cal="lunar" id="modeLunar" aria-pressed="false">农历</button>
+      </div>
       <div class="cal-wrap" id="calWrap" data-open="true">
         <div class="cal-wrap-inner">
           <div class="cal">
@@ -105,14 +129,33 @@
         </div>
       </div>
 
+      <div class="lunar-panel" id="lunarPanel" hidden>
+        <div class="lunar-head">
+          <span class="lunar-title">农历日期</span>
+          <button type="button" class="leap-chip" data-act="toggle-lunar-leap" id="leapChip" aria-pressed="false">闰月</button>
+        </div>
+        <div class="lunar-months" id="lunarMonths"></div>
+        <div class="lunar-days" id="lunarDays"></div>
+        <p class="lunar-note" id="lunarNote"></p>
+      </div>
+
       <div class="picked" id="picked"></div>
 
       <div class="field">
-        <label for="evName">事件名称 <span class="hint">必填</span></label>
+        <label for="evName" id="nameLabel">事件名称 <span class="hint">必填</span></label>
         <input id="evName" type="text" maxlength="24" autocomplete="off" placeholder="给这个日子起个名字">
+        <p class="birth-preview" id="birthPreview" hidden></p>
       </div>
 
-      <div class="field">
+      <div class="field" id="timeField">
+        <label for="evTime">截止时刻 <span class="hint">可选 · 不会单独提醒</span></label>
+        <div class="time-row">
+          <input id="evTime" type="time" step="60" aria-label="截止时刻">
+          <button type="button" class="link time-clear" data-act="clear-time" id="timeClear" hidden>清除</button>
+        </div>
+      </div>
+
+      <div class="field" id="fieldCat1">
         <label>一级分类 <span class="hint">可不选</span></label>
         <div class="chips" id="chip1"></div>
       </div>
@@ -130,15 +173,31 @@
         <span class="switch" data-on="false" aria-hidden="true"></span>
       </button>
 
-      <div class="field">
+      <div class="switch-row locked" id="birthRepeat" hidden aria-disabled="true">
+        <span class="switch-text">
+          <b>每年重复</b>
+          <i>生日会自动每年重复</i>
+        </span>
+        <span class="switch" data-on="true" aria-hidden="true"></span>
+      </div>
+
+      <div class="field" id="remindField">
+        <label>提醒 <span class="hint">用系统通知 · 可多选</span></label>
+        <div class="chips" id="remindChips"></div>
+        <div class="remind-times" id="remindTimes" hidden></div>
+        <p class="field-note" id="remindNote" hidden>通知权限还没开启，提醒暂时不会发送。</p>
+      </div>
+
+      <div class="field" id="noteField">
         <label for="evNote">备注 <span class="hint">可选</span></label>
         <textarea id="evNote" rows="2" maxlength="140" placeholder="想记下的话"></textarea>
       </div>
 
-      <p class="editor-hint">未来的日子会倒数，过去的日子会纪念。</p>
+      <p class="editor-hint" id="editorHint">未来的日子会倒数，过去的日子会纪念。</p>
     </div>
-    <div class="sheet-foot">
+    <div class="sheet-foot" id="editorFoot">
       <button class="primary" data-act="editor-save" id="saveBtn">保存</button>
+      <button class="ghost danger-text" data-act="delete-birthday" id="birthDeleteBtn" hidden>删除生日</button>
     </div>
   </section>
 </div>
@@ -217,6 +276,68 @@
         <summary>如何获取应用密码？</summary>
         <p>坚果云网页版 → 右上角账户信息 → 安全选项 → 添加应用密码。</p>
         <p>账号与应用密码只保存在本机，仅用于访问你自己的坚果云 WebDAV，可随时在坚果云撤销。若忘记密码，重新生成一个即可。</p>
+      </details>
+    </div>
+  </section>
+</div>
+
+<!-- 提醒设置 -->
+<div class="layer" id="remindLayer" hidden>
+  <section class="sheet sync-sheet" role="dialog" aria-modal="true" aria-labelledby="remindTitle">
+    <div class="grabber"></div>
+    <button class="sheet-close" data-act="remind-close" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
+    <header class="sync-head">
+      <div class="sync-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 18.5h5"/><path d="M12 4.2a5.3 5.3 0 0 0-5.3 5.3c0 4-1.5 5.4-2.1 6.2-.3.4 0 .9.5.9h13.8c.5 0 .8-.5.5-.9-.6-.8-2.1-2.2-2.1-6.2A5.3 5.3 0 0 0 12 4.2Z"/></svg>
+      </div>
+      <h2 id="remindTitle">提醒</h2>
+      <p>生日和日子到了，用系统通知告诉你。</p>
+    </header>
+    <div class="sheet-scroll">
+      <div class="cloud-status" id="notifStatus" data-state="off">
+        <span class="cloud-status-dot" aria-hidden="true"></span>
+        <div class="cloud-status-text">
+          <b id="notifStatusTitle">未开启</b>
+          <small id="notifStatusSub">打开通知权限后即可收到提醒</small>
+        </div>
+      </div>
+
+      <button class="primary notif-perm-btn" data-act="request-notif" id="notifPermBtn">开启通知权限</button>
+
+      <button class="switch-row" data-act="toggle-notify" id="notifyRow" role="switch" aria-checked="false">
+        <span class="switch-text">
+          <b>开启提醒</b>
+          <i>关闭后不再发送任何通知</i>
+        </span>
+        <span class="switch" data-on="false" aria-hidden="true"></span>
+      </button>
+
+      <div class="field">
+        <label for="notifyTime">默认通知时间 <span class="hint">新建时自动带上</span></label>
+        <input id="notifyTime" type="time" step="60" value="09:00">
+      </div>
+
+      <div class="field">
+        <label>默认提前 <span class="hint">新建时自动带上</span></label>
+        <div class="chips" id="notifyLeads"></div>
+      </div>
+
+      <p class="notify-warn" id="exactWarn" hidden>系统未允许「闹钟与提醒」，通知可能延迟。<button class="link" data-act="exact-perm">去允许</button></p>
+
+      <p class="modal-note">每个日子和生日都可以在编辑页单独设置提醒；关闭提醒不会影响记录本身。</p>
+      <p class="cloud-msg" id="notifyMsg" hidden></p>
+
+      <div class="cloud-actions">
+        <button class="ghost" data-act="test-notif" id="testNotifBtn">发送一条测试通知</button>
+      </div>
+
+      <details class="cloud-help">
+        <summary>收不到通知怎么办？</summary>
+        <p>请确认系统「设置 → 应用 → 优日 → 通知」已允许，并允许「闹钟与提醒」，否则通知可能延迟。</p>
+        <p>国产手机（小米、华为、OPPO、vivo 等）还需要在系统管家里允许「自启动」和「后台运行」，否则清理后台后可能收不到。</p>
+        <p>提醒在本机触发，不联网也能用。</p>
       </details>
     </div>
   </section>
