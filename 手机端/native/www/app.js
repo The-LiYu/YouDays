@@ -1623,12 +1623,15 @@ function subfolderHTML(sub, sortMeta) {
         <span class="sub-count">${sub.events.length}</span>
         ${sortArrowsHTML('cat', sub.cat.id, sortMeta.first, sortMeta.last)}
       </div>`
-    : `<button class="sub-head" data-act="toggle-sub" data-key="${key}" aria-expanded="${open}">
-        <span class="sub-dash"></span>
-        <span class="sub-name">${esc(sub.cat.name)}</span>
-        <span class="sub-count">${sub.events.length}</span>
-        ${ICONS.chevron}
-      </button>`;
+    : `<div class="sub-top">
+        <button class="sub-head" data-act="toggle-sub" data-key="${key}" aria-expanded="${open}">
+          <span class="sub-dash"></span>
+          <span class="sub-name">${esc(sub.cat.name)}</span>
+          <span class="sub-count">${sub.events.length}</span>
+          ${ICONS.chevron}
+        </button>
+        <button class="head-add small" data-act="new-in-cat" data-cat1="${sub.cat.parent}" data-cat2="${sub.cat.id}" aria-label="在${esc(sub.cat.name)}下新建日子">${ICONS.plus}</button>
+      </div>`;
   const events = sub.events
     .map((ev, i) => eventHTML(ev, sortMeta ? { first: i === 0, last: i === sub.events.length - 1 } : null))
     .join('');
@@ -1658,12 +1661,15 @@ function groupHTML(group, sortMeta) {
         <span class="folder-count">${group.events.length} 个</span>
         ${group.cat ? sortArrowsHTML('cat', group.cat.id, sortMeta.first, sortMeta.last) : ''}
       </div>`
-    : `<button class="folder-head" data-act="toggle-folder" data-key="${group.key}" aria-expanded="${open}">
-        <span class="folder-swatch" style="--c:${color}"></span>
-        <span class="folder-name">${esc(name)}</span>
-        <span class="folder-count">${group.events.length} 个</span>
-        ${ICONS.chevron}
-      </button>`;
+    : `<div class="folder-top">
+        <button class="folder-head" data-act="toggle-folder" data-key="${group.key}" aria-expanded="${open}">
+          <span class="folder-swatch" style="--c:${color}"></span>
+          <span class="folder-name">${esc(name)}</span>
+          <span class="folder-count">${group.events.length} 个</span>
+          ${ICONS.chevron}
+        </button>
+        ${group.cat ? `<button class="head-add" data-act="new-in-cat" data-cat1="${group.cat.id}" aria-label="在${esc(name)}下新建日子">${ICONS.plus}</button>` : ''}
+      </div>`;
   return `<section class="folder" data-open="${open}" data-key="${group.key}">
     ${head}
     <div class="folder-body"><div class="folder-inner"><div class="folder-pad">${inner}</div></div></div>
@@ -2076,15 +2082,15 @@ function closeDetail() {
 
 /* ---------------------------- 事件 / 生日编辑器 ---------------------------- */
 
-function openEditor(ev) {
-  startEditor(ev, 'event');
+function openEditor(ev, preset) {
+  startEditor(ev, 'event', preset);
 }
 
 function openBirthdayEditor(b) {
   startEditor(b, 'birthday');
 }
 
-function startEditor(target, kind) {
+function startEditor(target, kind, preset) {
   const isBirth = kind === 'birthday';
   const date = target ? target.date : todayStr();
   const d = parseYmd(date);
@@ -2094,8 +2100,8 @@ function startEditor(target, kind) {
     date,
     name: target ? target.name : '',
     time: !isBirth && target ? target.time || '' : '',
-    cat1: !isBirth && target ? target.cat1 : '',
-    cat2: !isBirth && target ? target.cat2 : '',
+    cat1: !isBirth && target ? target.cat1 : preset && preset.cat1 ? preset.cat1 : '',
+    cat2: !isBirth && target ? target.cat2 : preset && preset.cat2 ? preset.cat2 : '',
     repeat: isBirth ? true : target ? target.repeatYearly : false,
     note: !isBirth && target ? target.note : '',
     calendar: target && target.lunar ? 'lunar' : 'solar',
@@ -2742,6 +2748,9 @@ document.addEventListener('click', (event) => {
   switch (act) {
     case 'new':
       openEditor(null);
+      break;
+    case 'new-in-cat':
+      openEditor(null, { cat1: el.dataset.cat1 || '', cat2: el.dataset.cat2 || '' });
       break;
     case 'new-birthday':
       openBirthdayEditor(null);

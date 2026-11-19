@@ -597,13 +597,58 @@ svg {
   margin-bottom: 10px;
 }
 
+.folder-top {
+  display: flex;
+  align-items: center;
+  padding-right: 9px;
+}
+
 .folder-head {
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   width: 100%;
   padding: 14px 15px;
   text-align: left;
+}
+
+.folder-top .folder-head {
+  padding-right: 4px;
+}
+
+.head-add {
+  flex: none;
+  width: 33px;
+  height: 33px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: #b3a795;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
+}
+
+.head-add svg {
+  width: 17px;
+  height: 17px;
+}
+
+.head-add:active {
+  background: var(--bg);
+  color: var(--accent);
+  transform: scale(0.94);
+}
+
+.head-add.small {
+  width: 29px;
+  height: 29px;
+  border-radius: 9px;
+}
+
+.head-add.small svg {
+  width: 15px;
+  height: 15px;
 }
 
 .folder-swatch {
@@ -641,7 +686,7 @@ svg {
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.folder[data-open="true"] > .folder-head .folder-chevron {
+.folder[data-open="true"] .folder-head .folder-chevron {
   transform: rotate(180deg);
 }
 
@@ -659,7 +704,7 @@ svg {
   grid-template-rows: 1fr;
 }
 
-.subfolder[data-open="true"] > .sub-head .folder-chevron {
+.subfolder[data-open="true"] .sub-head .folder-chevron {
   transform: rotate(180deg);
 }
 
@@ -684,8 +729,17 @@ svg {
   border-top: 0;
 }
 
+.sub-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: -6px;
+}
+
 .sub-head {
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 9px;
   width: 100%;

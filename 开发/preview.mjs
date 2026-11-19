@@ -215,6 +215,42 @@ results.topbarLayout = await evaluate(`(() => {
 })()`);
 await shot('01-home');
 
+// 首页分类标题旁的「+」新建事件
+results.headAddCount = await evaluate("document.querySelectorAll('.head-add').length");
+results.subHeadAddCount = await evaluate("document.querySelectorAll('.head-add.small').length");
+results.headAddLayout = await evaluate(`(() => {
+  const rect = ${rectScript};
+  const btn = document.querySelector('.folder-top .head-add');
+  const head = document.querySelector('.folder-top .folder-head');
+  const add = rect('.folder-top .head-add');
+  return {
+    inViewport: add.right <= innerWidth,
+    afterHead: add.left >= head.getBoundingClientRect().right - 1,
+    overflowX: document.documentElement.scrollWidth - innerWidth
+  };
+})()`);
+await evaluate("document.querySelector('.folder-top .head-add').click()");
+await sleep(450);
+results.presetCat1 = await evaluate(`(() => {
+  const active = document.querySelector('#chip1 .chip.on');
+  const cat = state.cats.find((c) => c.id === editor.cat1);
+  return { open: !!document.querySelector('#editorLayer.open'), active: active ? active.textContent.trim() : null, name: cat ? cat.name : null };
+})()`);
+await evaluate("document.querySelector('[data-act=\"editor-close\"]').click()");
+await sleep(350);
+await evaluate("document.querySelector('.head-add.small').click()");
+await sleep(450);
+await evaluate("document.querySelector('#fieldCat1').scrollIntoView({ block: 'center' })");
+await sleep(350);
+results.presetCat2 = await evaluate(`(() => {
+  const active = document.querySelector('#chip2 .chip.on');
+  const cat = state.cats.find((c) => c.id === editor.cat2);
+  return { active: active ? active.textContent.trim() : null, name: cat ? cat.name : null, parent: cat ? cat.parent : null };
+})()`);
+await shot('01b-head-add-editor');
+await evaluate("document.querySelector('[data-act=\"editor-close\"]').click()");
+await sleep(350);
+
 // 首页排序模式
 await evaluate("document.querySelector('[data-act=\"sort-start\"]').click()");
 await sleep(450);
@@ -832,6 +868,41 @@ await sleep(450);
 results.todoCompletionPersisted = await evaluate("document.querySelectorAll('.done-card .todo-row').length");
 results.todoStatePersisted = await evaluate("JSON.parse(localStorage.getItem('youri.state.v1')).todos.every((t) => typeof t.done === 'boolean')");
 await evaluate("localStorage.clear()");
+
+// 360 宽窄屏：分类标题旁的「+」不挤压标题、不出现横向滚动
+await cdp.send('Emulation.setDeviceMetricsOverride', {
+  width: 360,
+  height: 640,
+  deviceScaleFactor: DSF,
+  mobile: true,
+  screenWidth: 360,
+  screenHeight: 640
+});
+await cdp.send('Page.navigate', { url: `http://127.0.0.1:${PORT}/index.html?demo=1` });
+await sleep(900);
+results.narrowLayout = await evaluate(`(() => {
+  const rect = ${rectScript};
+  const folderHeads = [...document.querySelectorAll('.folder-top')];
+  const subHeads = [...document.querySelectorAll('.sub-top')];
+  const target = (el) => el ? el.getBoundingClientRect() : null;
+  return {
+    overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    addButtons: document.querySelectorAll('.head-add').length,
+    folderAddRight: folderHeads.map((h) => Math.round(target(h.querySelector('.head-add')).right)),
+    subAddRight: subHeads.map((h) => Math.round(target(h.querySelector('.head-add')).right)),
+    foldersOverlap: folderHeads.some((h) => {
+      const add = target(h.querySelector('.head-add'));
+      const name = target(h.querySelector('.folder-name'));
+      return add.left < name.right - 1;
+    }),
+    subsOverlap: subHeads.some((h) => {
+      const add = target(h.querySelector('.head-add'));
+      const name = target(h.querySelector('.sub-name'));
+      return add.left < name.right - 1;
+    }),
+    viewport: innerWidth
+  };
+})()`);
 
 results.errors = errors;
 console.log(JSON.stringify(results, null, 2));
