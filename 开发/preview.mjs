@@ -331,22 +331,39 @@ results.calTitleStart = await calTitle();
 await touchDrag(calSwipeFrom, calY, calSwipeTo, calY, async () => {
   results.calDragFollow = await evaluate(`(() => {
     const grid = document.querySelector('#calGrid');
-    return { transform: grid.style.transform, opacity: grid.style.opacity, dragging: grid.classList.contains('dragging') };
+    const ghost = document.querySelector('.cal-ghost');
+    const g = grid.getBoundingClientRect();
+    const h = ghost ? ghost.getBoundingClientRect() : null;
+    return {
+      transform: grid.style.transform,
+      dragging: grid.classList.contains('dragging'),
+      ghost: !!ghost,
+      adjacent: !!h && Math.abs(Math.round(h.left) - Math.round(g.right)) <= 1,
+      overlap: !!h && h.left < g.right - 1,
+      ghostText: ghost ? ghost.textContent.slice(0, 12) : null,
+      currentText: grid.textContent.slice(0, 12)
+    };
   })()`);
 });
 results.calTitleAfterSwipeLeft = await calTitle();
 results.calDateAfterSwipe = await evaluate("editor.date === todayStr()");
 await touchDrag(calSwipeTo, calY, calSwipeFrom, calY);
 results.calTitleAfterSwipeRight = await calTitle();
+// 拖动不足阈值：弹回原月份，不翻页
+const shortDragTitle = await calTitle();
+await touchDrag(calSwipeFrom, calY, calSwipeFrom - 30, calY);
+results.calShortDragTitle = await calTitle();
+results.calShortDragSame = results.calShortDragTitle === shortDragTitle;
+results.calShortDragGhostLeft = await evaluate("document.querySelectorAll('.cal-ghost').length");
 await evaluate("document.querySelector('[data-act=\"cal-next\"]').click()");
 results.calGhostDuringAnim = await evaluate("document.querySelectorAll('.cal-ghost').length");
-await sleep(400);
+await sleep(450);
 results.calTitleAfterNext = await calTitle();
 results.calCellsAfterShift = await evaluate("document.querySelectorAll('#calGrid .cal-cell').length");
 results.calGhostAfterAnim = await evaluate("document.querySelectorAll('.cal-ghost').length");
 await shot('18-cal-swipe');
 await evaluate("document.querySelector('[data-act=\"cal-prev\"]').click()");
-await sleep(400);
+await sleep(450);
 results.calTitleBack = await calTitle();
 
 // 竖向滑动不翻月，横向滑动后轻点仍能选日期

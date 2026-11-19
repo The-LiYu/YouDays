@@ -2144,6 +2144,7 @@ function startEditor(target, kind, preset) {
 }
 
 function closeEditor() {
+  clearCalLayers();
   closeLayer($('#editorLayer'));
   editor = null;
   blurActive();
@@ -2259,36 +2260,19 @@ function calendarCellsHTML(viewY, viewM) {
   return { html: cells.join(''), monthMarks };
 }
 
-function renderCalendar(dir = 0) {
+function renderCalendar() {
   if (!editor) return;
+  clearCalLayers();
   const { viewY, viewM } = editor;
   $('#calTitle').textContent = `${viewY}年${viewM}月`;
-  const grid = $('#calGrid');
-  const wrap = $('#calGridWrap');
-  grid.classList.remove('cal-in-left', 'cal-in-right', 'dragging');
-  grid.style.transform = '';
-  grid.style.opacity = '';
-  if (dir && wrap) {
-    const ghost = document.createElement('div');
-    ghost.className = `cal-grid cal-ghost ${dir > 0 ? 'cal-out-left' : 'cal-out-right'}`;
-    ghost.setAttribute('aria-hidden', 'true');
-    ghost.innerHTML = grid.innerHTML;
-    wrap.appendChild(ghost);
-    setTimeout(() => ghost.remove(), 320);
-  }
   const { html, monthMarks } = calendarCellsHTML(viewY, viewM);
-  grid.innerHTML = html;
-  if (dir) {
-    void grid.offsetWidth;
-    grid.classList.add(dir > 0 ? 'cal-in-right' : 'cal-in-left');
-  }
+  $('#calGrid').innerHTML = html;
   const noun = editor.kind === 'birthday' ? '生日' : '日子';
   $('#calEventsHint').textContent = monthMarks ? `本月 ${monthMarks} 个${noun}` : `本月暂无${noun}`;
 }
 
-/* 日历左右滑动切换月份：拖动时轻微跟手，松手超过阈值翻页 */
-function shiftCalendarMonth(step) {
-  if (!editor) return;
+/* 相邻月份（跨年时一起调整年份），超出 1900–2100 返回 null */
+function neighborMonth(step) {
   let m = editor.viewM + step;
   let y = editor.viewY;
   if (m < 1) {
@@ -2298,10 +2282,88 @@ function shiftCalendarMonth(step) {
     m = 1;
     y += 1;
   }
-  editor.viewM = m;
-  editor.viewY = Math.min(2100, Math.max(1900, y));
-  renderCalendar(step);
-  if (!$('#jumpPanel').hidden) renderJump();
+  if (y < 1900 || y > 2100) return null;
+  return { y, m };
+}
+
+/* ---------------------------- 翻月动画 ---------------------------- */
+/* 两层不透明的月历并排滑动：旧月从一侧滑出，新月从另一侧滑入，
+   两层始终首尾相接、互不重叠，因此不会出现两个月份的日期叠在一起 */
+
+const CAL_SLIDE_MS = 280;
+let calSlideTimer = 0;
+let calAnimating = false;
+
+function clearCalLayers() {
+  const grid = $('#calGrid');
+  if (grid) {
+    grid.classList.remove('cal-anim', 'dragging');
+    grid.style.transform = '';
+  }
+  $$('#calGridWrap .cal-ghost').forEach((layer) => layer.remove());
+  clearTimeout(calSlideTimer);
+  calAnimating = false;
+}
+
+function makeMonthLayer(html) {
+  const layer = document.createElement('div');
+  layer.className = 'cal-grid cal-ghost';
+  layer.setAttribute('aria-hidden', 'true');
+  layer.innerHTML = html;
+  $('#calGridWrap').appendChild(layer);
+  return layer;
+}
+
+/* sign > 0：翻到下个月（新月从右侧进入）；sign < 0：上个月（从左侧进入）
+   startDx 是松手时当前层已经拖到的位移，动画从这里接着走 */
+function slideToMonth(sign, startDx = 0) {
+  if (!editor || calAnimating) return;
+  const grid = $('#calGrid');
+  const nb = neighborMonth(sign);
+  if (!grid || !nb) return;
+  const width = grid.offsetWidth || $('#calGridWrap').clientWidth;
+  if (!width) return;
+  const dx = Math.max(-width, Math.min(width, startDx));
+  clearCalLayers();
+  const layer = makeMonthLayer(calendarCellsHTML(nb.y, nb.m).html);
+  grid.style.transform = `translateX(${dx}px)`;
+  layer.style.transform = `translateX(${sign * width + dx}px)`;
+  void grid.offsetWidth;
+  calAnimating = true;
+  grid.classList.add('cal-anim');
+  layer.classList.add('cal-anim');
+  requestAnimationFrame(() => {
+    grid.style.transform = `translateX(${-sign * width}px)`;
+    layer.style.transform = 'translateX(0)';
+  });
+  calSlideTimer = setTimeout(() => {
+    if (!editor) {
+      clearCalLayers();
+      return;
+    }
+    editor.viewY = nb.y;
+    editor.viewM = nb.m;
+    renderCalendar();
+    if (!$('#jumpPanel').hidden) renderJump();
+  }, CAL_SLIDE_MS + 30);
+}
+
+/* 位移不够时弹回原月份 */
+function snapBackMonth(sign, startDx) {
+  const grid = $('#calGrid');
+  const layer = $('#calGridWrap .cal-ghost');
+  if (!grid) return;
+  const width = grid.offsetWidth || 0;
+  grid.classList.remove('dragging');
+  if (layer) layer.classList.remove('dragging');
+  grid.classList.add('cal-anim');
+  if (layer) layer.classList.add('cal-anim');
+  grid.style.transform = 'translateX(0)';
+  if (layer) layer.style.transform = `translateX(${sign * width}px)`;
+  calAnimating = true;
+  calSlideTimer = setTimeout(() => {
+    clearCalLayers();
+  }, CAL_SLIDE_MS + 30);
 }
 
 let calDrag = null;
@@ -2311,12 +2373,6 @@ function bindCalendarSwipe() {
   const wrap = $('#calGridWrap');
   const grid = $('#calGrid');
   if (!wrap || !grid) return;
-  const reset = () => {
-    grid.classList.remove('dragging');
-    grid.style.transform = '';
-    grid.style.opacity = '';
-    calDrag = null;
-  };
   wrap.addEventListener(
     'click',
     (event) => {
@@ -2331,56 +2387,75 @@ function bindCalendarSwipe() {
   wrap.addEventListener('pointerdown', (event) => {
     // 新的按下说明是用户主动点击，取消上一次拖动留下的点击拦截
     calSwipeGuard = 0;
-    if (!editor || !editor.calOpen) return;
+    if (!editor || !editor.calOpen || calAnimating) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    calDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, dx: 0, active: false, locked: false };
+    calDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, dx: 0, width: 0, sign: 0, layer: null, active: false, locked: false };
   });
   wrap.addEventListener('pointermove', (event) => {
-    if (!calDrag || (calDrag.id !== undefined && event.pointerId !== calDrag.id)) return;
+    if (!calDrag || event.pointerId !== calDrag.id) return;
     const dx = event.clientX - calDrag.x;
     const dy = event.clientY - calDrag.y;
     if (!calDrag.active) {
-      if (calDrag.locked || (Math.abs(dx) < 10 && Math.abs(dy) < 10)) return;
+      if (calDrag.locked || (Math.abs(dx) < 8 && Math.abs(dy) < 8)) return;
       if (Math.abs(dy) >= Math.abs(dx)) {
         calDrag.locked = true;
         return;
       }
+      const sign = dx < 0 ? 1 : -1;
+      const nb = neighborMonth(sign);
+      const width = grid.offsetWidth;
+      if (!nb || !width) {
+        calDrag.locked = true;
+        return;
+      }
       calDrag.active = true;
+      calDrag.sign = sign;
+      calDrag.width = width;
+      calDrag.layer = makeMonthLayer(calendarCellsHTML(nb.y, nb.m).html);
+      calDrag.layer.style.transform = `translateX(${sign * width}px)`;
       grid.classList.add('dragging');
+      calDrag.layer.classList.add('dragging');
       try {
         wrap.setPointerCapture(event.pointerId);
       } catch (err) {
         /* 指针已失效时忽略 */
       }
     }
-    calDrag.dx = dx;
-    const capped = Math.max(-64, Math.min(64, dx)) * 0.5;
-    grid.style.transform = `translateX(${capped.toFixed(1)}px)`;
-    grid.style.opacity = String(Math.max(0.72, 1 - Math.abs(capped) / 180));
+    const width = calDrag.width;
+    const moved = calDrag.sign > 0 ? Math.max(-width, Math.min(0, dx)) : Math.min(width, Math.max(0, dx));
+    calDrag.dx = moved;
+    grid.style.transform = `translateX(${moved}px)`;
+    if (calDrag.layer) calDrag.layer.style.transform = `translateX(${calDrag.sign * width + moved}px)`;
   });
   const finish = (event) => {
     if (!calDrag) return;
-    if (calDrag.id !== undefined && event.pointerId !== calDrag.id) return;
-    const dx = calDrag.dx;
-    const active = calDrag.active;
+    if (event.pointerId !== calDrag.id) return;
+    const { dx, sign, active } = calDrag;
     calDrag = null;
     if (!active) return;
     calSwipeGuard = Date.now();
     grid.classList.remove('dragging');
-    grid.style.transform = '';
-    grid.style.opacity = '';
-    if (Math.abs(dx) >= 48) shiftCalendarMonth(dx < 0 ? 1 : -1);
+    if (Math.abs(dx) >= 48) {
+      slideToMonth(sign, dx);
+    } else {
+      snapBackMonth(sign, dx);
+    }
   };
   wrap.addEventListener('pointerup', finish);
   wrap.addEventListener('pointercancel', () => {
-    if (calDrag && calDrag.active) reset();
-    else calDrag = null;
+    if (!calDrag) return;
+    const { sign, active } = calDrag;
+    calDrag = null;
+    if (active) snapBackMonth(sign, 0);
   });
   wrap.addEventListener('lostpointercapture', (event) => {
     // 触摸按下时浏览器会把指针隐式捕获到某个日期按钮上，我们改为捕获到 wrap 时
     // 该按钮会先抛 lostpointercapture 并冒泡到这里，那不是拖动结束。
     if (event.target !== wrap) return;
-    if (calDrag && calDrag.active) reset();
+    if (!calDrag) return;
+    const { sign, active } = calDrag;
+    calDrag = null;
+    if (active) snapBackMonth(sign, 0);
   });
 }
 
@@ -3000,7 +3075,7 @@ document.addEventListener('click', (event) => {
 
     case 'cal-prev':
     case 'cal-next':
-      shiftCalendarMonth(act === 'cal-prev' ? -1 : 1);
+      slideToMonth(act === 'cal-prev' ? -1 : 1);
       break;
     case 'cal-jump':
       toggleJump();
