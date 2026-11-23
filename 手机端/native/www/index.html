@@ -386,6 +386,13 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<!-- 普通脚本按顺序加载，不引入构建步骤：常量/农历 → 状态 → 同步 → 通知 → 视图 → 编辑器 → 交互入口 -->
+<script src="js/core.js"></script>
+<script src="js/store.js"></script>
+<script src="js/cloud.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/views.js"></script>
+<script src="js/editor.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

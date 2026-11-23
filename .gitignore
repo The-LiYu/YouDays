@@ -7,14 +7,15 @@ build-*.log
 *.hprof
 .DS_Store
 
-# 上一版 APK（只保留当前版本）
-/手机端/优日-1.0.0.apk
+# 构建产物：APK 只保留在本地，随 Release 分发
 *.apk
+# 签名文件不进仓库
+*.jks
+*.keystore
 
-
-# 本地构建工具链
+# 本地构建工具链与临时目录
 /Env/
 /temp/
-_C盘Temp_20261021/
+/_C盘Temp_*/
 CLAUDE.md
 AGENTS.md
